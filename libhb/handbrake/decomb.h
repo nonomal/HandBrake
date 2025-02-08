@@ -1,6 +1,6 @@
 /* decomb.h
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -20,6 +20,5 @@
 #define MODE_YADIF_ENABLE       1
 #define MODE_YADIF_SPATIAL      2
 #define MODE_XXDIF_BOB          4
-#define MODE_DEINTERLACE_QSV    8
 
 #endif // HANDBRAKE_DECOMB_H

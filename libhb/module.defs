@@ -1,14 +1,18 @@
-__deps__ := A52DEC BZIP2 LIBVPX SVT-AV1 FFMPEG FREETYPE LAME LIBASS LIBDCA \
-    LIBDVDREAD LIBDVDNAV LIBICONV LIBSAMPLERATE LIBTHEORA LIBVORBIS LIBOGG \
-    LIBXML2 X264 X265 ZLIB LIBBLURAY FDKAAC LIBVPL LIBGNURX JANSSON \
-    HARFBUZZ LIBOPUS LIBSPEEX LIBDAV1D LIBJPEGTURBO
+__deps__ := BZIP2 LIBVPX SVT-AV1 FFMPEG FREETYPE LAME LIBASS \
+    LIBDVDREAD LIBDVDNAV LIBICONV LIBTHEORA LIBVORBIS LIBOGG \
+    X264 X265 ZLIB LIBBLURAY FDKAAC LIBVPL LIBGNURX JANSSON \
+    HARFBUZZ LIBOPUS LIBSPEEX LIBDAV1D LIBJPEGTURBO LIBDOVI
 
 ifeq (,$(filter $(HOST.system),darwin cygwin mingw))
     __deps__ += FONTCONFIG
 endif
+ifeq (netbsd,$(HOST.system))
+    __deps__ += LIBJPEGTURBO
+endif
 
 $(eval $(call import.MODULE.defs,LIBHB,libhb,$(__deps__)))
 $(eval $(call import.GCC,LIBHB))
+$(eval $(call import.METAL,LIBHB))
 
 ###############################################################################
 
@@ -21,6 +25,7 @@ LIBHB.m4.out = $(patsubst $(LIBHB.src/)%.m4,$(LIBHB.build/)%,$(LIBHB.m4.in))
 LIBHB.c   = $(wildcard $(LIBHB.src/)*.c)
 LIBHB.c.o = $(patsubst $(SRC/)%.c,$(BUILD/)%.o,$(LIBHB.c))
 LIBHB.m.o = $(patsubst $(SRC/)%.m,$(BUILD/)%.o,$(LIBHB.m))
+LIBHB.metal.o = $(patsubst $(SRC/)%.metal,$(BUILD/)%.o,$(LIBHB.metal))
 LIBHB.d   = $(LIBHB.m4.out) $(LIBHB.h.out) \
     $(foreach n,$(LIBHB.prerequisites),$($n.INSTALL.target) )
 
@@ -37,38 +42,25 @@ LIBHB.a = $(LIBHB.build/)$(call TARGET.archive,handbrake)
 LIBHB.out += $(LIBHB.m4.out)
 LIBHB.out += $(LIBHB.c.o)
 LIBHB.out += $(LIBHB.m.o)
+LIBHB.out += $(LIBHB.metal.o)
 LIBHB.out += $(LIBHB.h.out)
 LIBHB.out += $(LIBHB.a)
 
 ###############################################################################
 
-LIBHB.GCC.D += __LIBHB__ USE_PTHREAD
+LIBHB.GCC.D += __LIBHB__
 LIBHB.GCC.I += $(LIBHB.build/) $(CONTRIB.build/)include
 
 ifeq (1,$(FEATURE.qsv))
-    ifeq ($(HOST.system),freebsd))
+    ifeq ($(HOST.system),freebsd)
         LIBHB.GCC.I += $(LOCALBASE)/include/vpl
     else
         LIBHB.GCC.I += $(CONTRIB.build/)include/vpl
     endif
 endif
 
-ifneq (,$(filter $(HOST.system),freebsd netbsd))
+ifneq (,$(filter $(HOST.system),freebsd netbsd openbsd))
     LIBHB.GCC.I += $(LOCALBASE)/include
-    LIBHB.GCC.I += $(LOCALBASE)/include/libxml2
-else ifneq (,$(filter $(HOST.system),darwin cygwin mingw))
-    LIBHB.GCC.I += $(CONTRIB.build/)include/libxml2
-else
-    LIBHB.libxml2 := $(shell $(PKGCONFIG.exe) --silence-errors --cflags libxml2)
-    ifeq (,$(LIBHB.libxml2))
-        LIBHB.libxml2 := $(shell $(PKGCONFIG.exe) --silence-errors --cflags libxml-2.0)
-    endif
-    ifneq (,$(LIBHB.libxml2))
-        LIBHB.libxml2 := $(patsubst -I%,%,$(LIBHB.libxml2))
-        LIBHB.GCC.I += $(LIBHB.libxml2)
-    else
-        LIBHB.GCC.I += /usr/include/libxml2
-    endif
 endif
 
 ifeq ($(HOST.system),cygwin)
@@ -77,12 +69,15 @@ else ifeq ($(HOST.system),darwin)
     LIBHB.GCC.D += SYS_DARWIN
     LIBHB.c += $(wildcard $(LIBHB.src/)platform/macosx/*.c)
     LIBHB.m += $(wildcard $(LIBHB.src/)platform/macosx/*.m)
+    LIBHB.metal += $(wildcard $(LIBHB.src/)platform/macosx/shaders/*.metal)
 else ifeq ($(HOST.system),linux)
     LIBHB.GCC.D += SYS_LINUX _LARGEFILE_SOURCE _FILE_OFFSET_BITS=64
 else ifeq ($(HOST.system),freebsd)
     LIBHB.GCC.D += SYS_FREEBSD _LARGEFILE_SOURCE _FILE_OFFSET_BITS=64
 else ifeq ($(HOST.system),netbsd)
     LIBHB.GCC.D += SYS_NETBSD _LARGEFILE_SOURCE _FILE_OFFSET_BITS=64
+else ifeq ($(HOST.system),openbsd)
+    LIBHB.GCC.D += SYS_OPENBSD
 else ifeq ($(HOST.system),mingw)
     LIBHB.GCC.D += SYS_MINGW
 ifneq ($(HAS.pthread),1)
@@ -96,6 +91,7 @@ else
 endif
 
 ifeq (1,$(FEATURE.qsv))
+    LIBHB.GCC.D += ONEVPL_EXPERIMENTAL
     LIBHB.GCC.D += HAVE_THREADS=1
 endif
 
@@ -120,8 +116,8 @@ LIBHB.dll = $(LIBHB.build/)hb.dll
 LIBHB.lib = $(LIBHB.build/)hb.lib
 
 LIBHB.dll.libs = $(foreach n, \
-        ass avformat avfilter avcodec avutil swresample postproc dvdnav dvdread \
-        freetype mp3lame swscale vpx theora vorbis vorbisenc ogg x264 xml2 \
+        ass avformat avfilter avcodec avutil swresample dvdnav dvdread \
+        freetype mp3lame swscale vpx theora vorbis vorbisenc ogg x264 \
         bluray jansson harfbuzz opus speex dav1d turbojpeg zimg SvtAv1Enc, \
         $(CONTRIB.build/)lib/lib$(n).a )
 
@@ -130,11 +126,16 @@ LIBHB.dll.libs += $(CONTRIB.build/)lib/libfdk-aac.a
 endif
 
 ifeq (1,$(FEATURE.qsv))
+LIBHB.GCC.D += ONEVPL_EXPERIMENTAL
 LIBHB.dll.libs += $(CONTRIB.build/)lib/libvpl.a
 endif
 
 ifeq (1,$(FEATURE.x265))
 LIBHB.dll.libs += $(CONTRIB.build/)lib/libx265.a
+endif
+
+ifeq (1,$(FEATURE.libdovi))
+LIBHB.dll.libs += $(CONTRIB.build/)lib/libdovi.a
 endif
 
 ifneq ($(HAS.iconv),1)
@@ -178,7 +179,7 @@ else
 endif
 
 LIBHB.GCC.args.extra.dylib++ += -Wl,--out-implib,$(LIBHB.lib)
-LIBHB.GCC.l += bcrypt ws2_32 uuid ole32 gdi32
+LIBHB.GCC.l += bcrypt ws2_32 uuid ole32 gdi32 userenv ntdll
 ifeq (1,$(FEATURE.mf))
     LIBHB.GCC.l += mfplat strmiids
 endif
@@ -186,7 +187,11 @@ ifeq ($(HAS.dlfcn),1)
     LIBHB.GCC.l += dl
 endif
 LIBHB.out += $(LIBHB.dll) $(LIBHB.lib)
-
+ifeq ($(HOST.machine),$(filter $(HOST.machine),aarch64))
+    ifneq (none,$(GCC.g))
+        LIBHB.out += $(LIBHB.pdb)
+    endif
+endif
 endif
 
 ###############################################################################

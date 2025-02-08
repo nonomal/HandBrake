@@ -1,6 +1,6 @@
 /* ports.c
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -10,34 +10,22 @@
 #include "handbrake/project.h"
 
 #ifdef SYS_MINGW
-#define _WIN32_WINNT 0x600
+#define _WIN32_WINNT 0x0601
 #endif
 
-#ifdef USE_PTHREAD
 #ifdef SYS_LINUX
 #define _GNU_SOURCE
 #include <sched.h>
 #endif
 #include <pthread.h>
-#endif
 
-#ifdef SYS_BEOS
-#include <kernel/OS.h>
-#endif
-
-#if defined(SYS_DARWIN) || defined(SYS_FREEBSD) || defined(SYS_NETBSD)
+#if defined(SYS_DARWIN) || defined(SYS_FREEBSD) || defined(SYS_NETBSD) || defined(SYS_OPENBSD)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #if HB_PROJECT_FEATURE_QSV && defined(SYS_FREEBSD)
 #include <libdrm/drm.h>
 #include <fcntl.h>
 #endif
-#endif
-
-#ifdef SYS_OPENBSD
-#include <sys/param.h>
-#include <sys/sysctl.h>
-#include <machine/cpu.h>
 #endif
 
 #ifdef SYS_MINGW
@@ -79,10 +67,6 @@
 #if HB_PROJECT_FEATURE_QSV
 #include <libdrm/drm.h>
 #endif
-#elif defined( SYS_OPENBSD )
-#include <sys/dvdio.h>
-#include <fcntl.h>
-#include <sys/ioctl.h>
 #endif
 
 #ifdef __APPLE__
@@ -119,35 +103,7 @@ int gettimeofday( struct timeval * tv, struct timezone * tz )
 #endif
 */
 
-// Convert utf8 string to current code page.
-// The internal string representation in hb is utf8. But some
-// libraries (libmkv, and mp4v2) expect filenames in the current
-// code page.  So we must convert.
-char * hb_utf8_to_cp(const char *src)
-{
-    char *dst = NULL;
-
-#if defined( SYS_MINGW )
-    int num_chars = MultiByteToWideChar(CP_UTF8, 0, src, -1, NULL, 0);
-    if (num_chars <= 0)
-        return NULL;
-    wchar_t * tmp = calloc(num_chars, sizeof(wchar_t));
-    MultiByteToWideChar(CP_UTF8, 0, src, -1, tmp, num_chars);
-    int len = WideCharToMultiByte(GetACP(), 0, tmp, num_chars, NULL, 0, NULL, NULL);
-    if (len <= 0)
-        return NULL;
-    dst = calloc(len, sizeof(char));
-    WideCharToMultiByte(GetACP(), 0, tmp, num_chars, dst, len, NULL, NULL);
-    free(tmp);
-#else
-    // Other platforms don't have code pages
-    dst = strdup(src);
-#endif
-
-    return dst;
-}
-
-int hb_dvd_region(char *device, int *region_mask)
+int hb_dvd_region(const char *device, int *region_mask)
 {
 #if defined( DVD_LU_SEND_RPC_STATE ) && defined( DVD_AUTH )
     struct stat  st;
@@ -220,12 +176,10 @@ void hb_snooze( int delay )
     {
         return;
     }
-#if defined( SYS_BEOS )
-    snooze( 1000 * delay );
-#elif defined( SYS_DARWIN ) || defined( SYS_LINUX ) || defined( SYS_FREEBSD) || defined(SYS_NETBSD) || defined( SYS_SunOS )
-    usleep( 1000 * delay );
-#elif defined( SYS_CYGWIN ) || defined( SYS_MINGW )
+#if defined( SYS_CYGWIN ) || defined( SYS_MINGW )
     Sleep( delay );
+#else
+    usleep( 1000 * delay );
 #endif
 }
 
@@ -248,21 +202,25 @@ struct
 
 int hb_get_cpu_count()
 {
+    init_cpu_info();
     return hb_cpu_info.count;
 }
 
 int hb_get_cpu_platform()
 {
+    init_cpu_info();
     return hb_cpu_info.platform;
 }
 
 const char* hb_get_cpu_name()
 {
+    init_cpu_info();
     return hb_cpu_info.name;
 }
 
 const char* hb_get_cpu_platform_name()
 {
+    init_cpu_info();
     switch (hb_cpu_info.platform)
     {
         case HB_CPU_PLATFORM_INTEL_BNL:
@@ -316,13 +274,16 @@ const char* hb_get_cpu_platform_name()
 
 static void init_cpu_info()
 {
-    hb_cpu_info.name     = NULL;
+    if (hb_cpu_info.count != 0)
+        return;
+
+    hb_cpu_info.name     = "Unknown";
     hb_cpu_info.count    = init_cpu_count();
     hb_cpu_info.platform = HB_CPU_PLATFORM_UNSPECIFIED;
 
+#if ARCH_X86_64 || ARCH_X86_32
     if (av_get_cpu_flags() & AV_CPU_FLAG_SSE)
     {
-#if ARCH_X86_64 || ARCH_X86_32
         int eax, ebx, ecx, edx, family, model;
 
         cpuid(1, &eax, &ebx, &ecx, &edx);
@@ -428,16 +389,29 @@ static void init_cpu_info()
                   &hb_cpu_info.buf4[10],
                   &hb_cpu_info.buf4[11]);
 
-            hb_cpu_info.name    = hb_cpu_info.buf;
-            hb_cpu_info.buf[47] = '\0'; // just in case
-
-            while (isspace(*hb_cpu_info.name))
-            {
-                // skip leading whitespace to prettify
-                hb_cpu_info.name++;
-            }
+            hb_cpu_info.name = hb_cpu_info.buf;
         }
-#endif // ARCH_X86_64 || ARCH_X86_32
+    }
+#elif defined(SYS_DARWIN)
+    size_t buflen = sizeof(hb_cpu_info.buf);
+    if (sysctlbyname("machdep.cpu.brand_string", &hb_cpu_info.buf, &buflen, NULL, 0) == 0)
+    {
+        hb_cpu_info.name = hb_cpu_info.buf;
+    }
+#endif
+
+    // ensure string is null-terminated and trim trailing whitespace
+    int ii = sizeof(hb_cpu_info.buf) - 1;
+    do {
+        hb_cpu_info.buf[ii] = '\0';
+        ii -= 1;
+    }
+    while (ii > 0 && isspace(hb_cpu_info.buf[ii]));
+
+    while (isspace(*hb_cpu_info.name))
+    {
+        // skip leading whitespace to prettify
+        hb_cpu_info.name++;
     }
 }
 
@@ -450,9 +424,7 @@ static int init_cpu_count()
     int cpu_count = 1;
 
 #if defined(SYS_CYGWIN) || defined(SYS_MINGW)
-    SYSTEM_INFO cpuinfo;
-    GetSystemInfo( &cpuinfo );
-    cpu_count = cpuinfo.dwNumberOfProcessors;
+    cpu_count = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
 
 #elif defined(SYS_LINUX)
     unsigned int bit;
@@ -462,15 +434,14 @@ static int init_cpu_count()
     for( cpu_count = 0, bit = 0; bit < sizeof(p_aff); bit++ )
          cpu_count += (((uint8_t *)&p_aff)[bit / 8] >> (bit % 8)) & 1;
 
-#elif defined(SYS_BEOS)
-    system_info info;
-    get_system_info( &info );
-    cpu_count = info.cpu_count;
-
 #elif defined(SYS_DARWIN) || defined(SYS_FREEBSD) || defined(SYS_NETBSD) || defined(SYS_OPENBSD)
     size_t length = sizeof( cpu_count );
 #if defined SYS_OPENBSD || defined(SYS_NETBSD)
+#ifdef HW_NCPUONLINE
+    int mib[2] = { CTL_HW, HW_NCPUONLINE };
+#else
     int mib[2] = { CTL_HW, HW_NCPU };
+#endif
     if( sysctl(mib, 2, &cpu_count, &length, NULL, 0) )
 #else
     if( sysctlbyname("hw.ncpu", &cpu_count, &length, NULL, 0) )
@@ -627,40 +598,66 @@ void hb_get_user_config_filename( char name[1024], char *fmt, ... )
 }
 
 /************************************************************************
- * Get a temporary directory for HB
+ * Creates a uniquely-named temporary directory for this process. On
+ * POSIX systems, mkdtemp(3) is used to ensure the directory name is
+ * unique even if multiple HandBrake instances have the same PID.
  ***********************************************************************/
-char * hb_get_temporary_directory()
-{
-    char * path, * base, * p;
+static pthread_once_t tmp_control = PTHREAD_ONCE_INIT;
+static char *tmp_dirname = NULL;
 
-    /* Create the base */
+static void
+hb_init_temporary_directory (void)
+{
+    char *path, *base, *p;
+
 #if defined( SYS_CYGWIN ) || defined( SYS_MINGW )
     base = malloc(MAX_PATH);
-    int i_size = GetTempPath( MAX_PATH, base );
-    if( i_size <= 0 || i_size >= MAX_PATH )
+    int i_size = GetTempPath(MAX_PATH, base);
+    if (i_size <= 0 || i_size >= MAX_PATH)
     {
-        if( getcwd( base, MAX_PATH ) == NULL )
-            strcpy( base, "c:" ); /* Bad fallback but ... */
+        if (getcwd(base, MAX_PATH) == NULL)
+            strcpy(base, "c:"); /* Bad fallback but ... */
     }
 
     /* c:/path/ works like a charm under cygwin(win32?) so use it */
-    while( ( p = strchr( base, '\\' ) ) )
+    while ((p = strchr(base, '\\')))
         *p = '/';
+
+    /* I prefer to remove eventual last '/' (for cygwin) */
+    if (base[strlen(base)-1] == '/')
+        base[strlen(base)-1] = '\0';
+
+    path = hb_strdup_printf("%s/HandBrake-%d", base, (int)getpid());
+    hb_mkdir(path);
+    free(base);
 #else
-    if( (p = getenv( "TMPDIR" ) ) != NULL ||
-        (p = getenv( "TEMP" ) )   != NULL )
+    if ((p = getenv("TMPDIR")) != NULL ||
+        (p = getenv("TEMP"))   != NULL)
         base = strdup(p);
     else
         base = strdup("/tmp");
-#endif
-    /* I prefer to remove eventual last '/' (for cygwin) */
-    if( base[strlen(base)-1] == '/' )
+
+    if (base[strlen(base)-1] == '/')
         base[strlen(base)-1] = '\0';
 
-    path = hb_strdup_printf("%s/hb.%d", base, (int)getpid());
+    /* Create a new randomly-named directory from the template */
+    path = hb_strdup_printf("%s/handbrake-XXXXXX", base);
+    if (!mkdtemp(path))
+    {
+        /* We still use the path even if directory creation fails */
+        hb_error("Failed to create a temporary directory at %s\n", path);
+    }
     free(base);
+#endif
+    tmp_dirname = path;
+}
 
-    return path;
+const char *
+hb_get_temporary_directory (void)
+{
+    /* Ensure the directory name is only created once */
+    pthread_once(&tmp_control, hb_init_temporary_directory);
+    return tmp_dirname;
 }
 
 /************************************************************************
@@ -670,14 +667,12 @@ char * hb_get_temporary_filename( char *fmt, ... )
 {
     va_list   args;
     char    * name, * path;
-    char    * dir = hb_get_temporary_directory();
 
     va_start( args, fmt );
     name = hb_strdup_vaprintf(fmt, args);
     va_end( args );
 
-    path = hb_strdup_printf("%s/%s", dir, name);
-    free(dir);
+    path = hb_strdup_printf("%s/%s", hb_get_temporary_directory(), name);
     free(name);
 
     return path;
@@ -809,7 +804,7 @@ char * hb_strr_dir_sep(const char *path)
  * Wrapper to the real mkdir, needed only because it doesn't take a
  * second argument on Win32. Grrr.
  ***********************************************************************/
-int hb_mkdir(char * path)
+int hb_mkdir(const char * path)
 {
 #ifdef SYS_MINGW
     wchar_t path_utf16[MAX_PATH];
@@ -833,14 +828,7 @@ struct hb_thread_s
 
     hb_lock_t     * lock;
     int             exited;
-
-#if defined( SYS_BEOS )
-    thread_id       thread;
-#elif USE_PTHREAD
     pthread_t       thread;
-//#elif defined( SYS_CYGWIN )
-//    HANDLE          thread;
-#endif
 };
 
 /* Get a unique identifier to thread and represent as 64-bit unsigned.
@@ -849,22 +837,18 @@ struct hb_thread_s
  */
 static uint64_t hb_thread_to_integer( const hb_thread_t* t )
 {
-#if defined( USE_PTHREAD )
-    #if defined( SYS_CYGWIN )
-        return (uint64_t)t->thread;
-    #elif defined( _WIN32 ) || defined( __MINGW32__ )
-    #if defined(PTW32_VERSION)
-        return (uint64_t)(ptrdiff_t)t->thread.p;
-    #else
-        return (uint64_t)t->thread;
-    #endif
-    #elif defined( SYS_DARWIN )
-        return (unsigned long)t->thread;
-    #else
-        return (uint64_t)t->thread;
-    #endif
+#if defined( SYS_CYGWIN )
+    return (uint64_t)t->thread;
+#elif defined( _WIN32 ) || defined( __MINGW32__ )
+# if defined(PTW32_VERSION)
+    return (uint64_t)(ptrdiff_t)t->thread.p;
+# else
+    return (uint64_t)t->thread;
+# endif
+#elif defined( SYS_DARWIN )
+    return (unsigned long)t->thread;
 #else
-    return 0;
+    return (uint64_t)t->thread;
 #endif
 }
 
@@ -882,7 +866,8 @@ static void attribute_align_thread hb_thread_func( void * _t )
 {
     hb_thread_t * t = (hb_thread_t *) _t;
 
-#if (defined( SYS_DARWIN ) && !defined(__aarch64__)) || defined( SYS_FREEBSD ) || defined ( __FreeBSD__ ) || defined(SYS_NETBSD)
+#if (defined( SYS_DARWIN ) && !defined(__aarch64__)) || defined( SYS_FREEBSD ) || \
+    defined( SYS_NETBSD ) || defined( SYS_OPENBSD )
     /* Set the thread priority
        Do not change priority on Darwin arm systems */
     struct sched_param param;
@@ -893,10 +878,6 @@ static void attribute_align_thread hb_thread_func( void * _t )
 
 #if defined( SYS_DARWIN )
     pthread_setname_np( t->name );
-#endif
-
-#if defined( SYS_BEOS )
-    signal( SIGINT, SIG_IGN );
 #endif
 
     /* Start the actual routine */
@@ -930,23 +911,8 @@ hb_thread_t * hb_thread_init( const char * name, void (* function)(void *),
     t->lock     = hb_lock_init();
 
     /* Create and start the thread */
-#if defined( SYS_BEOS )
-    t->thread = spawn_thread( (thread_func) hb_thread_func,
-                              name, priority, t );
-    resume_thread( t->thread );
-
-#elif USE_PTHREAD
     pthread_create( &t->thread, NULL,
                     (void * (*)( void * )) hb_thread_func, t );
-
-//#elif defined( SYS_CYGWIN )
-//    t->thread = CreateThread( NULL, 0,
-//        (LPTHREAD_START_ROUTINE) hb_thread_func, t, 0, NULL );
-//
-//    /* Maybe use THREAD_PRIORITY_LOWEST instead */
-//    if( priority == HB_LOW_PRIORITY )
-//        SetThreadPriority( GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL );
-#endif
 
     hb_deep_log( 2, "thread %"PRIx64" started (\"%s\")", hb_thread_to_integer( t ), t->name );
     return t;
@@ -962,16 +928,7 @@ void hb_thread_close( hb_thread_t ** _t )
     hb_thread_t * t = *_t;
 
     /* Join the thread */
-#if defined( SYS_BEOS )
-    long exit_value;
-    wait_for_thread( t->thread, &exit_value );
-
-#elif USE_PTHREAD
     pthread_join( t->thread, NULL );
-
-//#elif defined( SYS_CYGWIN )
-//    WaitForSingleObject( t->thread, INFINITE );
-#endif
 
     hb_deep_log( 2, "thread %"PRIx64" joined (\"%s\")", hb_thread_to_integer( t ), t->name );
 
@@ -1002,13 +959,7 @@ int hb_thread_has_exited( hb_thread_t * t )
  ***********************************************************************/
 struct hb_lock_s
 {
-#if defined( SYS_BEOS )
-    sem_id          sem;
-#elif USE_PTHREAD
     pthread_mutex_t mutex;
-//#elif defined( SYS_CYGWIN )
-//    HANDLE          mutex;
-#endif
 };
 
 /************************************************************************
@@ -1023,21 +974,16 @@ hb_lock_t * hb_lock_init()
 {
     hb_lock_t * l = calloc( sizeof( hb_lock_t ), 1 );
 
-#if defined( SYS_BEOS )
-    l->sem = create_sem( 1, "sem" );
-#elif USE_PTHREAD
     pthread_mutexattr_t mta;
 
     pthread_mutexattr_init(&mta);
 
-#if defined( SYS_CYGWIN ) || defined( SYS_FREEBSD ) || defined ( __FreeBSD__ ) || defined(SYS_NETBSD)
+#if defined( SYS_CYGWIN ) || defined( SYS_FREEBSD ) || defined( SYS_NETBSD ) || \
+    defined( SYS_OPENBSD )
     pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_NORMAL);
 #endif
 
     pthread_mutex_init( &l->mutex, &mta );
-//#elif defined( SYS_CYGWIN )
-//    l->mutex = CreateMutex( 0, FALSE, 0 );
-#endif
 
     return l;
 }
@@ -1050,13 +996,7 @@ void hb_lock_close( hb_lock_t ** _l )
     {
         return;
     }
-#if defined( SYS_BEOS )
-    delete_sem( l->sem );
-#elif USE_PTHREAD
     pthread_mutex_destroy( &l->mutex );
-//#elif defined( SYS_CYGWIN )
-//    CloseHandle( l->mutex );
-#endif
     free( l );
 
     *_l = NULL;
@@ -1064,24 +1004,12 @@ void hb_lock_close( hb_lock_t ** _l )
 
 void hb_lock( hb_lock_t * l )
 {
-#if defined( SYS_BEOS )
-    acquire_sem( l->sem );
-#elif USE_PTHREAD
     pthread_mutex_lock( &l->mutex );
-//#elif defined( SYS_CYGWIN )
-//    WaitForSingleObject( l->mutex, INFINITE );
-#endif
 }
 
 void hb_unlock( hb_lock_t * l )
 {
-#if defined( SYS_BEOS )
-    release_sem( l->sem );
-#elif USE_PTHREAD
     pthread_mutex_unlock( &l->mutex );
-//#elif defined( SYS_CYGWIN )
-//    ReleaseMutex( l->mutex );
-#endif
 }
 
 /************************************************************************
@@ -1089,13 +1017,7 @@ void hb_unlock( hb_lock_t * l )
  ***********************************************************************/
 struct hb_cond_s
 {
-#if defined( SYS_BEOS )
-    int                 thread;
-#elif USE_PTHREAD
     pthread_cond_t      cond;
-//#elif defined( SYS_CYGWIN )
-//    HANDLE              event;
-#endif
 };
 
 /************************************************************************
@@ -1114,14 +1036,7 @@ hb_cond_t * hb_cond_init()
     if( c == NULL )
         return NULL;
 
-#if defined( SYS_BEOS )
-    c->thread = -1;
-#elif USE_PTHREAD
     pthread_cond_init( &c->cond, NULL );
-//#elif defined( SYS_CYGWIN )
-//    c->event = CreateEvent( NULL, FALSE, FALSE, NULL );
-#endif
-
     return c;
 }
 
@@ -1133,12 +1048,7 @@ void hb_cond_close( hb_cond_t ** _c )
     {
         return;
     }
-#if defined( SYS_BEOS )
-#elif USE_PTHREAD
     pthread_cond_destroy( &c->cond );
-//#elif defined( SYS_CYGWIN )
-//    CloseHandle( c->event );
-#endif
     free( c );
 
     *_c = NULL;
@@ -1146,18 +1056,7 @@ void hb_cond_close( hb_cond_t ** _c )
 
 void hb_cond_wait( hb_cond_t * c, hb_lock_t * lock )
 {
-#if defined( SYS_BEOS )
-    c->thread = find_thread( NULL );
-    release_sem( lock->sem );
-    suspend_thread( c->thread );
-    acquire_sem( lock->sem );
-    c->thread = -1;
-#elif USE_PTHREAD
     pthread_cond_wait( &c->cond, &lock->mutex );
-//#elif defined( SYS_CYGWIN )
-//    SignalObjectAndWait( lock->mutex, c->event, INFINITE, FALSE );
-//    WaitForSingleObject( lock->mutex, INFINITE );
-#endif
 }
 
 void hb_clock_gettime( struct timespec *tp )
@@ -1176,51 +1075,22 @@ void hb_yield(void)
 
 void hb_cond_timedwait( hb_cond_t * c, hb_lock_t * lock, int msec )
 {
-#if defined( SYS_BEOS )
-    c->thread = find_thread( NULL );
-    release_sem( lock->sem );
-    suspend_thread( c->thread );
-    acquire_sem( lock->sem );
-    c->thread = -1;
-#elif USE_PTHREAD
     struct timespec ts;
     hb_clock_gettime(&ts);
     ts.tv_nsec += (msec % 1000) * 1000000;
     ts.tv_sec += msec / 1000 + (ts.tv_nsec / 1000000000);
     ts.tv_nsec %= 1000000000;
     pthread_cond_timedwait( &c->cond, &lock->mutex, &ts );
-#endif
 }
 
 void hb_cond_signal( hb_cond_t * c )
 {
-#if defined( SYS_BEOS )
-    while( c->thread != -1 )
-    {
-        thread_info info;
-        get_thread_info( c->thread, &info );
-        if( info.state == B_THREAD_SUSPENDED )
-        {
-            resume_thread( c->thread );
-            break;
-        }
-        /* Looks like we have been called between hb_cond_wait's
-           release_sem() and suspend_thread() lines. Wait until the
-           thread is actually suspended before we resume it */
-        snooze( 5000 );
-    }
-#elif USE_PTHREAD
     pthread_cond_signal( &c->cond );
-//#elif defined( SYS_CYGWIN )
-//    PulseEvent( c->event );
-#endif
 }
 
 void hb_cond_broadcast( hb_cond_t * c )
 {
-#if USE_PTHREAD
     pthread_cond_broadcast( &c->cond );
-#endif
 }
 
 /************************************************************************
@@ -1414,7 +1284,7 @@ void hb_system_sleep_private_disable(void *opaque)
 void * hb_dlopen(const char *name)
 {
 #ifdef SYS_MINGW
-    HMODULE h = LoadLibraryA(name);
+    HMODULE h = LoadLibraryExA(name, NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
 #else
     void *h = dlopen(name, RTLD_LAZY | RTLD_LOCAL);
 #endif
@@ -1589,10 +1459,20 @@ static int try_adapter(const char * name, const char * dir,
     return -1;
 }
 
-static int open_adapter(const char * name)
+static int open_adapter(const char * name, const uint dri_render_node)
 {
-    int fd = try_adapter(name, DRI_PATH, DRI_NODE_RENDER,
-                         DRI_RENDER_NODE_START, DRI_RENDER_NODE_LAST);
+    int fd;
+    // If dri_render_node is unknown enumerate across the predifined range of renders
+    if (dri_render_node == 0)
+    {
+        fd = try_adapter(name, DRI_PATH, DRI_NODE_RENDER,
+                            DRI_RENDER_NODE_START, DRI_RENDER_NODE_LAST);
+    }
+    else
+    {
+        fd = try_adapter(name, DRI_PATH, DRI_NODE_RENDER,
+                            dri_render_node, dri_render_node);
+    }
     if (fd < 0)
     {
         fd = try_adapter(name, DRI_PATH, DRI_NODE_CARD,
@@ -1628,7 +1508,8 @@ static int try_va_interface(hb_display_t * hbDisplay,
     return 0;
 }
 
-hb_display_t * hb_display_init(const char         *  driver_name,
+hb_display_t * hb_display_init(const char         * driver_name,
+                               const uint32_t       dri_render_node,
                                const char * const * interface_names)
 {
     hb_display_t * hbDisplay = calloc(sizeof(hb_display_t), 1);
@@ -1636,7 +1517,7 @@ hb_display_t * hb_display_init(const char         *  driver_name,
     int            ii;
 
     hbDisplay->vaDisplay = NULL;
-    hbDisplay->vaFd      = open_adapter(driver_name);
+    hbDisplay->vaFd      = open_adapter(driver_name, dri_render_node);
     if (hbDisplay->vaFd < 0)
     {
         hb_deep_log( 3, "hb_va_display_init: no display found" );
@@ -1703,7 +1584,8 @@ void hb_display_close(hb_display_t ** _d)
 
 #else // !SYS_LINUX && !SYS_FREEBSD
 
-hb_display_t * hb_display_init(const char         *  driver_name,
+hb_display_t * hb_display_init(const char         * driver_name,
+                               const uint32_t       dri_render_node,
                                const char * const * interface_names)
 {
     return NULL;
@@ -1717,7 +1599,8 @@ void hb_display_close(hb_display_t ** _d)
 #endif // SYS_LINUX || SYS_FREEBSD
 #else // !HB_PROJECT_FEATURE_QSV
 
-hb_display_t * hb_display_init(const char         *  driver_name,
+hb_display_t * hb_display_init(const char         * driver_name,
+                               const uint32_t       dri_render_node,
                                const char * const * interface_names)
 {
     return NULL;

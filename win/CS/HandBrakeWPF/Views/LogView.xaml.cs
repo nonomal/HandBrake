@@ -13,9 +13,11 @@ namespace HandBrakeWPF.Views
     using System.Diagnostics;
     using System.Windows;
     using System.Windows.Controls;
+    using System.Windows.Input;
 
     using HandBrake.App.Core.Utilities;
 
+    using HandBrakeWPF.Commands;
     using HandBrakeWPF.Helpers;
     using HandBrakeWPF.Services.Logging.EventArgs;
     using HandBrakeWPF.ViewModels;
@@ -30,6 +32,13 @@ namespace HandBrakeWPF.Views
             this.InitializeComponent();
             this.DataContextChanged += this.LogView_DataContextChanged;
             this.Closed += this.LogView_Closed;
+            this.InputBindings.Add(new InputBinding(new CloseWindowCommand(this), new KeyGesture(Key.W, ModifierKeys.Control))); // Close Window
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            WindowHelper.SetDarkMode(this);
         }
 
         private void LogView_Closed(object sender, EventArgs e)

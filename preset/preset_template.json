@@ -39,8 +39,8 @@
         "Folder": false,
         "FolderOpen": false,
         "InlineParameterSets": false,
-        "MetadataPassthrough": true,
-        "Mp4HttpOptimize": false,
+        "MetadataPassthru": true,
+        "Optimize": false,
         "Mp4iPodCompatible": false,
         "PictureAllowUpscaling": false,
         "PictureUseMaximumSize": true,
@@ -121,8 +121,9 @@
         "VideoQualitySlider": 20.0,
         "VideoQSVDecode": false,
         "VideoHWDecode": 0,
-        "VideoTwoPass": false,
-        "VideoTurboTwoPass": false,
+        "VideoMultiPass": false,
+        "VideoTurboMultiPass": false,
+        "VideoPasshtruHDRDynamicMetadata": "all",
         "x264Option": "",
         "x264UseAdvancedOptions": false
     }

@@ -512,11 +512,26 @@ namespace HandBrakeWPF.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The format of the output file. In addition to any supported file system character, you can use the any of the placeholders that will be replaced when you change title or scan a source or update certain settings..
+        ///   Looks up a localized string similar to The format of the output file. In addition to any supported file system character, you can use any of the placeholders that will be replaced when you change title or scan a source or update certain settings.
+        ///
+        ///{source} - Name of the source file.
+        ///{title} - Integer value. This is representative of a disc title number.
+        ///{chapters} - The range of chapters selected.
+        ///{creation-date} - The date that the source file was created on (if available).
+        ///{creation-time} - The time that the source file was created o [rest of string was truncated]&quot;;.
         /// </summary>
         public static string Options_AdditionalFormatOptions {
             get {
                 return ResourceManager.GetString("Options_AdditionalFormatOptions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Dash (-), Period (.) and Comma (,).
+        /// </summary>
+        public static string Options_RemovePunctuation {
+            get {
+                return ResourceManager.GetString("Options_RemovePunctuation", resourceCulture);
             }
         }
         
@@ -527,6 +542,28 @@ namespace HandBrakeWPF.Properties {
         public static string OptionsView_AlwaysUseDefaultPath {
             get {
                 return ResourceManager.GetString("OptionsView_AlwaysUseDefaultPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The following can be used singularly, or together to build up a destination path
+        ///
+        ///{source_path} - In the same folder as the source path (if possible)
+        ///{source_folder_name} – The name of the directory that the source file is in, without the full path.
+        ///{source} - The name of the source file..
+        /// </summary>
+        public static string OptionsView_DestinationReplacementOptions {
+            get {
+                return ResourceManager.GetString("OptionsView_DestinationReplacementOptions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Launches the documentation website located at https://handbrake.fr/docs.
+        /// </summary>
+        public static string OptionsView_LaunchsHelp {
+            get {
+                return ResourceManager.GetString("OptionsView_LaunchsHelp", resourceCulture);
             }
         }
         
@@ -575,13 +612,22 @@ namespace HandBrakeWPF.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to If not enabled, scaled dimensions will be limited to source dimensions..
+        /// </summary>
+        public static string PictureSettingsView_AllowUpscaling {
+            get {
+                return ResourceManager.GetString("PictureSettingsView_AllowUpscaling", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Anamorphic allows arbitrary storage dimensions while preserving the original aspect during playback.
         ///
         ///None disables anamorphic. Video storage dimensions and display dimensions will be identical. Only useful for compatibility with certain legacy devices.
         ///
         ///Automatic maximizes storage resolution while preserving the original display aspect ratio. Recommended.
         ///
-        ///Loose is similar to Auto, but attempts to preserve the storage aspect ratio. This can result in a slight storage resolution loss compared to Auto. [rest of string was truncated]&quot;;.
+        ///Custom allows manually setting all parameters. Useful for correcting an incorrect source display aspect and for professionals needing advanced con [rest of string was truncated]&quot;;.
         /// </summary>
         public static string PictureSettingsView_Anamorphic {
             get {
@@ -595,6 +641,15 @@ namespace HandBrakeWPF.Properties {
         public static string PictureSettingsView_AutoCrop {
             get {
                 return ResourceManager.GetString("PictureSettingsView_AutoCrop", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Changing the displays size will stretch the video.
+        /// </summary>
+        public static string PictureSettingsView_AutomaticKeepAR {
+            get {
+                return ResourceManager.GetString("PictureSettingsView_AutomaticKeepAR", resourceCulture);
             }
         }
         
@@ -671,6 +726,15 @@ namespace HandBrakeWPF.Properties {
         public static string PictureSettingsView_Modulus {
             get {
                 return ResourceManager.GetString("PictureSettingsView_Modulus", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Use highest resolution permitted by above settings.
+        /// </summary>
+        public static string PictureSettingsView_OptimalSize {
+            get {
+                return ResourceManager.GetString("PictureSettingsView_OptimalSize", resourceCulture);
             }
         }
         
@@ -853,6 +917,19 @@ namespace HandBrakeWPF.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Perform Multi Pass Encoding.
+        ///
+        ///The &apos;Bitrate&apos; option is prerequisite. During the analysis passes, statistics about
+        ///the video are collected. Then in the final pass, those statistics are used
+        ///to make bitrate allocation decisions..
+        /// </summary>
+        public static string Video_MultiPass {
+            get {
+                return ResourceManager.GetString("Video_MultiPass", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Enables variable framerate output with a peak rate determined by the framerate setting..
         /// </summary>
         public static string Video_PeakFramerate {
@@ -905,24 +982,11 @@ namespace HandBrakeWPF.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to During the 1st pass of a 2 pass encode, use settings that speed things along..
+        ///   Looks up a localized string similar to During the analysis pass of a multi pass encode, use settings that speed things along..
         /// </summary>
-        public static string Video_TurboFirstPass {
+        public static string Video_TurboAnalysisPass {
             get {
-                return ResourceManager.GetString("Video_TurboFirstPass", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Perform 2 Pass Encoding.
-        ///
-        ///The &apos;Bitrate&apos; option is prerequisite. During the 1st pass, statistics about
-        ///the video are collected.  Then in the second pass, those statistics are used
-        ///to make bitrate allocation decisions..
-        /// </summary>
-        public static string Video_TwoPass {
-            get {
-                return ResourceManager.GetString("Video_TwoPass", resourceCulture);
+                return ResourceManager.GetString("Video_TurboAnalysisPass", resourceCulture);
             }
         }
         

@@ -60,45 +60,45 @@
             : and then encoded with base64 encoding.
     -->
   <xsd:schema xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata" id="root">
-    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace"/>
     <xsd:element name="root" msdata:IsDataSet="true">
       <xsd:complexType>
         <xsd:choice maxOccurs="unbounded">
           <xsd:element name="metadata">
             <xsd:complexType>
               <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+                <xsd:element name="value" type="xsd:string" minOccurs="0"/>
               </xsd:sequence>
-              <xsd:attribute name="name" use="required" type="xsd:string" />
-              <xsd:attribute name="type" type="xsd:string" />
-              <xsd:attribute name="mimetype" type="xsd:string" />
-              <xsd:attribute ref="xml:space" />
+              <xsd:attribute name="name" use="required" type="xsd:string"/>
+              <xsd:attribute name="type" type="xsd:string"/>
+              <xsd:attribute name="mimetype" type="xsd:string"/>
+              <xsd:attribute ref="xml:space"/>
             </xsd:complexType>
           </xsd:element>
           <xsd:element name="assembly">
             <xsd:complexType>
-              <xsd:attribute name="alias" type="xsd:string" />
-              <xsd:attribute name="name" type="xsd:string" />
+              <xsd:attribute name="alias" type="xsd:string"/>
+              <xsd:attribute name="name" type="xsd:string"/>
             </xsd:complexType>
           </xsd:element>
           <xsd:element name="data">
             <xsd:complexType>
               <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1"/>
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2"/>
               </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
-              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
-              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
-              <xsd:attribute ref="xml:space" />
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1"/>
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3"/>
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4"/>
+              <xsd:attribute ref="xml:space"/>
             </xsd:complexType>
           </xsd:element>
           <xsd:element name="resheader">
             <xsd:complexType>
               <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1"/>
               </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" />
+              <xsd:attribute name="name" type="xsd:string" use="required"/>
             </xsd:complexType>
           </xsd:element>
         </xsd:choice>
@@ -112,10 +112,10 @@
     <value>2.0</value>
   </resheader>
   <resheader name="reader">
-    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <resheader name="writer">
-    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="FilterView_Deblock" xml:space="preserve">
     <value>Deblock redukuje blokowe artefakty spowodowane kompresją wideo o niskiej jakości.</value>
@@ -163,15 +163,13 @@ HQDN3D to adaptacyjny filtr dolnoprzepustowy, szybszy niż NLMeans, ale mniej sk
 Źródła Blu-ray i DVD często mają wiele tytułów, z których najdłuższy jest zwykle główną cechą</value>
   </data>
   <data name="PictureSettingsView_Anamorphic" xml:space="preserve">
-    <value>Anamorficzny pozwala na dowolne wymiary przechowywania, zachowując oryginalny wygląd podczas odtwarzania.
+    <value>Anamorphic allows arbitrary storage dimensions while preserving the original aspect during playback.
 
-Brak wyłącza anamorficzny. Wymiary miejsca do przechowywania wideo i wymiary wyświetlacza będą identyczne. Przydatne tylko ze względu na zgodność z niektórymi starszymi urządzeniami.
+None disables anamorphic. Video storage dimensions and display dimensions will be identical. Only useful for compatibility with certain legacy devices.
 
-Automatycznie maksymalizuje rozdzielczość przechowywania, zachowując oryginalne proporcje ekranu. Zalecana.
+Automatic maximizes storage resolution while preserving the original display aspect ratio. Recommended.
 
-Loose jest podobny do Auto, ale próbuje zachować proporcje pamięci. Może to spowodować niewielką utratę rozdzielczości pamięci w porównaniu z trybem Auto.
-
-Custom umożliwia ręczne ustawienie wszystkich parametrów. Przydatne do korygowania nieprawidłowego aspektu wyświetlania źródła oraz dla profesjonalistów potrzebujących zaawansowanej kontroli w postprodukcji.</value>
+Custom allows manually setting all parameters. Useful for correcting an incorrect source display aspect and for professionals needing advanced control in post-production.</value>
   </data>
   <data name="PictureSettingsView_AutoCrop" xml:space="preserve">
     <value>Automatycznie przycinaj czarne obramowania wokół krawędzi wideo.</value>
@@ -263,12 +261,15 @@ Zastępuje wszystkie inne ustawienia.</value>
     <value>Włącza wyjście ze zmienną liczbą klatek na sekundę ze szczytową liczbą klatek określoną przez ustawienie liczby klatek na sekundę.</value>
   </data>
   <data name="Video_Presets" xml:space="preserve">
-    <value>Dostosowuje ustawienia kodera w celu kompromisu między wydajnością kompresji a szybkością kodowania.
+    <value>Adjusts encoder settings to trade off compression efficiency against encoding speed.
 
-To określa domyślne ustawienia kodera.
-Do tego zostaną zastosowane melodie, profile, poziomy i zaawansowane ciągi opcji.
-Generalnie powinieneś ustawić tę opcję na najwolniejszą, jaką możesz znieść, ponieważ wolniej
-ustawienia spowodują lepszą jakość lub mniejsze pliki.</value>
+This establishes your default encoder settings.
+Tunes, profiles, levels and advanced option string will be applied to this.
+You should generally set this option to the slowest you can bear since slower
+settings will result in better quality or smaller files.
+
+Adjust the slider to the right to increase compression efficiency at the expense of encoding speed,
+or to the left to increase encoding speed at the expense of compression efficiency.</value>
   </data>
   <data name="Video_Profile" xml:space="preserve">
     <value>Ustawia i zapewnia zgodność z określonym profilem.
@@ -290,16 +291,15 @@ Sugerowane wartości to: 18 do 20 dla źródeł o standardowej rozdzielczości i
 Skala FFMpega i Theory jest bardziej liniowa.
 Te kodery nie mają trybu bezstratnego.</value>
   </data>
-  <data name="Video_TurboFirstPass" xml:space="preserve">
-    <value>Podczas pierwszego przebiegu 2-przebiegowego kodowania użyj ustawień, które przyspieszają działanie.</value>
+  <data name="Video_TurboAnalysisPass" xml:space="preserve">
+    <value>Podczas przebiegu analizy kodowania wieloprzebiegowego należy użyć ustawień, które przyspieszą działanie.</value>
   </data>
-  <data name="Video_TwoPass" xml:space="preserve">
-    <value>Wykonaj 2 przebiegowe kodowanie
+  <data name="Video_MultiPass" xml:space="preserve">
+    <value>Wykonaj kodowanie wieloprzebiegowe.
 
-Opcja „Bitrate” jest warunkiem wstępnym. Podczas 1st przejazdu
- statystyki dotyczące filmy są gromadzone. Następnie w drugim przejściu
- wykorzystywane są te statystyki podejmować decyzje dotyczące alokacji
- przepływności.</value>
+Opcja „Bitrate” jest wymagana. Podczas przebiegów analizy zbierane są statystyki
+wideo są gromadzone. Następnie w ostatnim przejściu statystyki te są wykorzystywane
+do podejmowania decyzji o alokacji przepływności.</value>
   </data>
   <data name="Video_VariableFramerate" xml:space="preserve">
     <value>Włącza wyjście ze zmienną liczbą klatek na sekundę.
@@ -349,21 +349,21 @@ HQDN3D default: y-spatial=3:cb-spatial=2:cr-spatial=2:y-temporal=2:cb-temporal=3
     <value>Wstępne ustawienie filtra odszumiania. Ustawia siłę filtra.</value>
   </data>
   <data name="FilterView_DenoiseTune" xml:space="preserve">
-    <value>Odszumiona melodia. Dalsze dostosowywanie ustawienia Odszumianie w celu optymalizacji ustawień pod kątem określonych scenariuszy.
+    <value>Dostrajanie odszumiania. Dodatkowo dostosowuje preset odszumiania w celu optymalizacji ustawień pod kątem określonych scenariuszy.
 
--Brak używa domyślnych ustawień wstępnych.
+- None (Brak) używa domyślnych ustawień wstępnych.
 
 - Film poprawia ustawienia do użytku z większością treści akcji na żywo.
 
-- Ziarno przetwarza tylko kanały kolorów. Przydatne do zachowania filmowego wyglądu ziarna luminancji przy jednoczesnym zmniejszeniu lub usunięciu szumu koloru
+- Grain (Ziarno) przetwarza tylko kanały kolorów. Przydatne do zachowania filmowego wyglądu ziarna luminancji przy jednoczesnym zmniejszeniu lub usunięciu szumu koloru
 
-- Tryb High Motion redukuje rozmazanie kolorów w scenach o dużym ruchu, unikając czasowego przetwarzania kanałów kolorów. Przydatne w przypadku filmów sportowych i akcji.
+- Tryb High Motion redukuje rozmazanie kolorów w scenach o dużym ruchu, unikając temporalnego przetwarzania kanałów kolorów. Przydatne w przypadku filmów sportowych i akcji.
 
-- Animacja jest przydatna do animacji cel, takich jak anime i kreskówki.
+- Animation (Animacja) jest przydatna do animacji celuloidowych, takich jak anime i kreskówki.
 
-- Taśma jest przydatna w przypadku źródeł taśm analogowych o małej szczegółowości, takich jak VHS, gdzie film nie daje pożądanych rezultatów.
+- (Tape) Taśma jest przydatna w przypadku źródeł taśm analogowych o małej szczegółowości, takich jak VHS, gdzie Film nie daje pożądanych rezultatów.
 
-- Sprite jest przydatny w 1-/4-/8-/16-2bitowych grach dwuwymiarowych. Sprite nie jest przeznaczony do wideo w wysokiej rozdzielczości.</value>
+- Sprite jest przydatny w 1-/4-/8-/16-bitowych grach dwuwymiarowych. Sprite nie jest przeznaczony do wideo w wysokiej rozdzielczości.</value>
   </data>
   <data name="FilterView_Deinterlace" xml:space="preserve">
     <value>Deinterlace usuwa artefakty grzebieniowe z obrazu.
@@ -438,19 +438,21 @@ Lapsharp wyostrza przy użyciu jąder splotu zbliżonych do filtrów brzegowych 
     <value>Wyostrz ustawienia filtra. Ustawia siłę filtra.</value>
   </data>
   <data name="FilterView_SharpenTune" xml:space="preserve">
-    <value>Wyostrz melodię. Dalsze dostosowywanie ustawienia wstępnego Wyostrzanie w celu optymalizacji ustawień pod kątem określonych scenariuszy.
+    <value>Dostrajalnie wyostrzania. Dalsze dostosowywanie presetu wyostrzania w celu optymalizacji ustawień pod kątem określonych scenariuszy.
 
-Żaden nie używa domyślnych ustawień wstępnych.
+None (Brak) używa domyślnych ustawień.
 
-Unsharp można dostroić do wyostrzania Ultrafine, Fine, Medium, Coarse lub Very Coarse. Wybierz jeden w oparciu o rozdzielczość wyjściowego obrazu i szczegółowość, którą chcesz poprawić.
+Unsharp można dostroić ustawieniami Ultrafine, Fine, Medium, Coarse lub Very Coarse. Wybierz jeden w oparciu o rozdzielczość wyjściowego obrazu i rozmiar detali, które chcesz uwypuklić.
 
-Filmowa melodia Lapsharp udoskonala ustawienia do użytku z większością treści akcji na żywo. Film wykorzystuje izotropowe jądro Laplace'a do podobnego wyostrzania wszystkich krawędzi, a informacje o luminancji (jasności) są wyostrzane bardziej niż informacje o chrominancji (kolorze).
+Dostrajanie Lapsharp:
 
-Melodia Lapsharp's Grain jest podobna do filmu Film, ale wykorzystuje izotropowy Laplacian jądra Gaussa, aby zmniejszyć wpływ na hałas i ziarno. Przydatny do konserwacji ziarna i jako ogólna alternatywa dla melodii Film.
+Film udoskonala ustawienia do użytku z większością treści akcji na żywo. Film wykorzystuje izotropowe jądro Laplace'a do podobnego wyostrzania wszystkich krawędzi, a informacje o luminancji (jasności) są wyostrzane bardziej niż informacje o chrominancji (kolorze).
 
-Melodia Lapsharp's Animation przydaje się do animacji cel, takich jak anime i kreskówki. Animacja jest taka sama jak Film, ale ogólna siła jest zmniejszona, aby uniknąć tworzenia artefaktów.
+Grain (Ziarno) jest podobne do Film, ale wykorzystuje izotropowy Laplacian jądra Gaussa, aby zmniejszyć wpływ na szum i ziarno. Przydatny do zachowania ziarna i jako ogólna alternatywa dla dostrojenia Film.
 
-Melodia Sprite firmy Lapsharp jest przydatna w 1-/4-/8-/16-bit grach 2-wymiarowych. Sprite używa 4-sąsiedzkiego jądra Laplace'a, które uwydatnia pionowe i poziome krawędzie bardziej niż krawędzie ukośne.</value>
+Animation (Animacja) przydaje się do animacji celuloidowych, takich jak anime i kreskówki. Animacja jest taka sama jak Film, ale siła jest zmniejszona, aby uniknąć tworzenia artefaktów.
+
+Sprite jest przydatne w 1-/4-/8-/16-bit grach 2-wymiarowych. Sprite używa 4-sąsiedzkiego jądra Laplace'a, które uwydatnia pionowe i poziome krawędzie bardziej niż krawędzie ukośne.</value>
   </data>
   <data name="MainView_AlignAVStart" xml:space="preserve">
     <value>Wyrównuje początkowe znaczniki czasu wszystkich strumieni audio i wideo przez wstawianie pustych ramek lub upuszczanie ramek. Może poprawić synchronizację audio/wideo dla uszkodzonych odtwarzaczy, które nie honorują list edycji MP4.</value>
@@ -515,7 +517,27 @@ Pamiętaj, że kody błędów nie zawsze mogą być dokładne.
 Zaleca się sprawdzenie poprawności pliku wyjściowego przed wykonaniem na nim działań.</value>
   </data>
   <data name="Options_AdditionalFormatOptions" xml:space="preserve">
-    <value>Format pliku wyjściowego. Oprócz dowolnego obsługiwanego znaku systemu plików można użyć dowolnego symbolu zastępczego, który zostanie zastąpiony po zmianie tytułu, zeskanowaniu źródła lub zaktualizowaniu niektórych ustawień.</value>
+    <value>Format pliku wyjściowego. Oprócz dowolnego obsługiwanego znaku systemu plików można użyć dowolnego z symboli zastępczych, które zostaną zastąpione po zmianie tytułu lub zeskanowaniu źródła lub zaktualizowaniu niektórych ustawień.
+
+{source}- Nazwa pliku źródłowego.
+{title} - Wartość całkowita. Jest to reprezentatywny numer tytułu płyty.
+{chapters} - zakres wybranych rozdziałów.
+{creation-date} - data utworzenia pliku źródłowego (jeśli jest dostępna).
+{creation-time} - czas utworzenia pliku źródłowego (jeśli jest dostępny).
+{modification-date} - data ostatniej modyfikacji pliku źródłowego (jeśli jest dostępna).
+{modification-time} - czas ostatniej modyfikacji pliku źródłowego (jeśli jest dostępny).
+{date} - dzisiaj. Ustawiane w momencie dodawania do kolejki.
+{time} - dzisiaj. Ustawiana w momencie dodawania do kolejki.
+{quality_bitrate} - numer RF/CQ lub bitrate
+{quality_type} - Drukuje „kbps” lub „Q” w zależności od trybu jakości wybranego na karcie wideo.
+{preset} - Nazwa wybranego ustawienia wstępnego.
+{encode_bit_depth} - Wartość całkowita, np. 8, 10 lub 12.
+{width} - szerokość pamięci wyjściowej
+{height} - wysokość zapisu wyjściowego
+{codec} - wyświetla format wideo.
+{encoder} - wyświetla krótki klucz formatu używanego kodera.
+
+Wszelkie niedozwolone znaki ścieżki zostaną automatycznie usunięte.</value>
   </data>
   <data name="OptionsView_RightToleftMode" xml:space="preserve">
     <value>W przypadku języków pisanych od prawej do lewej możesz włączyć jeden z dwóch trybów. „Tylko tekst” wyrenderuje tekst tylko w stylu od prawej do lewej. „Cały interfejs użytkownika” wyrenderuje wszystkie elementy sterujące od prawej do lewej.
@@ -527,5 +549,27 @@ Należy pamiętać, że podczas korzystania z tych trybów w układzie interfejs
 1 to najniższa jakość, a 5 to najwyższa jakość.
 
 Bitrate będzie się różnić od źródła do źródła.</value>
+  </data>
+  <data name="OptionsView_DestinationReplacementOptions" xml:space="preserve">
+    <value>Następujące elementy mogą być używane pojedynczo lub razem, aby utworzyć ścieżkę docelową
+
+{source_path} - W tym samym folderze co ścieżka źródłowa (jeśli to możliwe)
+{source_folder_name} - Nazwa katalogu, w którym znajduje się plik źródłowy, bez pełnej ścieżki.
+{source} - Nazwa pliku źródłowego.</value>
+  </data>
+  <data name="OptionsView_LaunchsHelp" xml:space="preserve">
+    <value>Uruchamia stronę internetową z dokumentacją znajdującą się pod adresem https://handbrake.fr/docs</value>
+  </data>
+  <data name="Options_RemovePunctuation" xml:space="preserve">
+    <value>Myślnik (-), kropka (.) i przecinek (,)</value>
+  </data>
+  <data name="PictureSettingsView_OptimalSize" xml:space="preserve">
+    <value>Use highest resolution permitted by above settings</value>
+  </data>
+  <data name="PictureSettingsView_AllowUpscaling" xml:space="preserve">
+    <value>If not enabled, scaled dimensions will be limited to source dimensions.</value>
+  </data>
+  <data name="PictureSettingsView_AutomaticKeepAR" xml:space="preserve">
+    <value>Changing the displays size will stretch the video</value>
   </data>
 </root>

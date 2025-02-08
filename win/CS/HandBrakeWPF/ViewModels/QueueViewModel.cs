@@ -16,6 +16,7 @@ namespace HandBrakeWPF.ViewModels
     using System.Diagnostics;
     using System.IO;
     using System.Linq;
+    using System.Threading.Tasks;
     using System.Windows;
     using System.Windows.Input;
 
@@ -32,9 +33,9 @@ namespace HandBrakeWPF.ViewModels
     using HandBrakeWPF.Services.Interfaces;
     using HandBrakeWPF.Services.Queue.Interfaces;
     using HandBrakeWPF.Services.Queue.Model;
+    using HandBrakeWPF.Utilities;
+    using HandBrakeWPF.Utilities.FileDialogs;
     using HandBrakeWPF.ViewModels.Interfaces;
-
-    using Microsoft.Win32;
 
     public class QueueViewModel : ViewModelBase, IQueueViewModel
     {
@@ -45,6 +46,11 @@ namespace HandBrakeWPF.ViewModels
         private WhenDone whenDoneAction;
         private QueueTask selectedTask;
         private bool isQueueRunning;
+        private bool extendedQueueDisplay;
+        private TaskExecutor queueStartRunner;
+        private bool isStartTimeEnabled;
+        private int startHour;
+        private int startMinute;
 
         public QueueViewModel(IUserSettingService userSettingService, IQueueService queueProcessor, IErrorService errorService)
         {
@@ -59,11 +65,16 @@ namespace HandBrakeWPF.ViewModels
             this.SelectedTabIndex = 0;
 
             this.WhenDoneAction = (WhenDone)this.userSettingService.GetUserSetting<int>(UserSettingConstants.WhenCompleteAction);
+            this.ExtendedQueueDisplay = this.userSettingService.GetUserSetting<bool>(UserSettingConstants.ExtendedQueueDisplay);
 
             this.WhenDoneCommand = new SimpleRelayCommand<int>(this.WhenDone);
             this.RetryCommand = new SimpleRelayCommand<QueueTask>(this.RetryJob);
             this.EditCommand = new SimpleRelayCommand<QueueTask>(this.EditJob);
+
+            this.queueStartRunner = new TaskExecutor();
         }
+
+        public event EventHandler SimpleViewChanged;
 
         public SimpleRelayCommand<QueueTask> EditCommand { get; set; }
         public SimpleRelayCommand<QueueTask> RetryCommand { get; set; }
@@ -140,7 +151,7 @@ namespace HandBrakeWPF.ViewModels
             }
         }
 
-        public bool JobInfoVisible => SelectedItems.Count == 1 && this.SelectedTask != null && !this.SelectedTask.IsBreakpointTask;
+        public bool JobInfoVisible => SelectedItems.Count == 1 && this.SelectedTask != null && this.SelectedTask.TaskType != QueueTaskType.Breakpoint;
 
         public int SelectedTabIndex { get; set; }
 
@@ -153,6 +164,8 @@ namespace HandBrakeWPF.ViewModels
         public bool CanRemoveJob => this.SelectedTask != null;
 
         public bool CanPerformActionOnSource => this.SelectedTask != null;
+
+        public bool IsSimpleView { get; set; }
 
         public bool CanPlayFile =>
             this.SelectedTask != null && this.SelectedTask.Task != null && this.SelectedTask.Task.Destination != null && 
@@ -169,6 +182,64 @@ namespace HandBrakeWPF.ViewModels
                 }
 
                 return false;
+            }
+        }
+
+        public bool ExtendedQueueDisplay
+        {
+            get => this.extendedQueueDisplay;
+            set
+            {
+                if (value == this.extendedQueueDisplay) return;
+                this.extendedQueueDisplay = value;
+                this.NotifyOfPropertyChange(() => this.ExtendedQueueDisplay);
+            }
+        }
+
+        public int StartHour
+        {
+            get => this.startHour;
+            set
+            {
+                if (value == this.startHour)
+                {
+                    return;
+                }
+
+                this.startHour = value;
+                this.NotifyOfPropertyChange(() => this.StartHour);
+                this.UpdateDelayedQueueStart();
+            }
+        }
+
+        public int StartMinute
+        {
+            get => this.startMinute;
+            set
+            {
+                if (value == this.startMinute)
+                {
+                    return;
+                }
+
+                this.startMinute = value;
+                this.NotifyOfPropertyChange(() => this.StartMinute);
+                this.UpdateDelayedQueueStart();
+            }
+        }
+
+        public bool IsStartTimeEnabled
+        {
+            get => this.isStartTimeEnabled;
+            set
+            {
+                if (value == this.isStartTimeEnabled)
+                {
+                    return;
+                }
+
+                this.isStartTimeEnabled = value;
+                this.NotifyOfPropertyChange(() => this.IsStartTimeEnabled);
             }
         }
 
@@ -242,8 +313,8 @@ namespace HandBrakeWPF.ViewModels
             if (this.queueProcessor.IsEncoding)
             {
                 MessageBoxResult result = this.errorService.ShowMessageBox(
-                    "There are currently jobs running. Would you like to complete the current jobs before stopping the queue?",
-                    "Confirm",
+                    Resources.QueueViewModel_StopButContinueJob,
+                    Resources.Question,
                     MessageBoxButton.YesNoCancel,
                     MessageBoxImage.Question);
 
@@ -257,16 +328,17 @@ namespace HandBrakeWPF.ViewModels
                 }
                 else
                 {
+                    this.IsQueueRunning = false;
                     this.queueProcessor.Stop(true);
                 }
             }
             else
             {
+                this.IsQueueRunning = false;
                 this.queueProcessor.Stop(true);
             }
 
             this.JobsPending = string.Format(Resources.QueueViewModel_JobsPending, this.queueProcessor.Count);
-            this.IsQueueRunning = false;
         }
 
         public void RemoveSelectedJobs()
@@ -386,6 +458,50 @@ namespace HandBrakeWPF.ViewModels
             this.IsQueueRunning = true;
 
             this.queueProcessor.Start();
+        }
+
+        public void StartQueueAtTime()
+        {
+            // Check for Pending Jobs
+            if (!this.QueueTasks.Any(a => a.Status == QueueItemStatus.Waiting || a.Status == QueueItemStatus.InProgress || a.Status == QueueItemStatus.Paused))
+            {
+                this.errorService.ShowMessageBox(
+                    Resources.QueueViewModel_NoPendingJobs, Resources.Error, MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            this.IsStartTimeEnabled = true;
+            DateTime start = DateTime.Now.AddHours(1);
+            this.startHour = start.Hour;
+            this.startMinute = start.Minute;
+            this.NotifyOfPropertyChange(() => this.StartHour);
+            this.NotifyOfPropertyChange(() => this.StartMinute);
+
+            UpdateDelayedQueueStart();
+        }
+
+        public void UpdateDelayedQueueStart()
+        {
+            queueStartRunner.ScheduleTask(this.StartHour, StartMinute,
+                () =>
+                {
+                    queueStartRunner.CancelTask();
+                    ThreadHelper.OnUIThread(
+                        () =>
+                        {
+                            if (!this.IsQueueRunning)
+                            {
+                                this.queueProcessor.Start();
+                                this.IsStartTimeEnabled = false;
+                            }
+                        });
+                });
+        }
+
+        public void CancelDelayedStart()
+        {
+            this.IsStartTimeEnabled = false;
+            queueStartRunner.CancelTask();
         }
 
         public void ExportCli()
@@ -526,13 +642,25 @@ namespace HandBrakeWPF.ViewModels
             }
         }
 
+        public void ToggleSimpleQueueDisplay()
+        {
+            this.IsSimpleView = !this.IsSimpleView;
+            this.NotifyOfPropertyChange(() => this.IsSimpleView);
+            OnSimpleViewChanged();
+            this.userSettingService.SetUserSetting(UserSettingConstants.SimpleQueueView, this.IsSimpleView);
+        }
+
         public void PlayFile()
         {
             if (this.SelectedTask != null && this.SelectedTask.Task != null && File.Exists(this.SelectedTask.Task.Destination))
             {
                 try
                 {
-                    Process.Start(this.SelectedTask.Task.Destination);
+                    Process p = new()
+                                {
+                                    StartInfo = new(this.SelectedTask.Task.Destination) { UseShellExecute = true }
+                                };
+                    p.Start();
                 }
                 catch (Win32Exception exc)
                 {
@@ -553,6 +681,11 @@ namespace HandBrakeWPF.ViewModels
             this.queueProcessor.MoveToBottom(this.SelectedItems);
         }
 
+        public void BackupQueue()
+        {
+            this.queueProcessor.BackupQueue(string.Empty);
+        }
+
         public override void Activate()
         {
             this.Load();
@@ -564,6 +697,10 @@ namespace HandBrakeWPF.ViewModels
 
             this.IsQueueRunning = this.queueProcessor.IsProcessing;
             this.JobsPending = string.Format(Resources.QueueViewModel_JobsPending, this.queueProcessor.Count);
+
+            this.IsSimpleView = this.userSettingService.GetUserSetting<bool>(UserSettingConstants.SimpleQueueView);
+            this.NotifyOfPropertyChange(() => this.IsSimpleView);
+            this.OnSimpleViewChanged();
 
             base.Activate();
         }
@@ -627,6 +764,12 @@ namespace HandBrakeWPF.ViewModels
             {
                 this.errorService.ShowError(Resources.Clipboard_Unavailable, Resources.Clipboard_Unavailable_Solution, exc);
             }
+        }
+
+        public void ChangeQueueDisplay()
+        {
+            this.ExtendedQueueDisplay = !this.ExtendedQueueDisplay;
+            this.userSettingService.SetUserSetting(UserSettingConstants.ExtendedQueueDisplay, this.ExtendedQueueDisplay);
         }
 
         private void HandleLogData()
@@ -716,6 +859,11 @@ namespace HandBrakeWPF.ViewModels
         {
             this.JobsPending = string.Format(Resources.QueueViewModel_JobsPending, this.queueProcessor.Count);
             this.IsQueueRunning = false;
+        }
+
+        protected virtual void OnSimpleViewChanged()
+        {
+            this.SimpleViewChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }

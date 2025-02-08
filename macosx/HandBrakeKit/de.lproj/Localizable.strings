@@ -4,8 +4,11 @@
 /* HBStateFormatter -> work time format */
 " (%.2f fps, avg %.2f fps, ETA %@)" = " (%1$.2f BpS, im Mittel %2$.2f BpS, ETA %3$@)";
 
+/* HBStateFormatter -> work time format */
+" (%.2f fps, avg %.2f fps)" = "(%1$.2f BpS, im Mittel %2$.2f BpS)";
+
 /* HBStateFormatter -> search time format
-   HBStateFormatter -> work time format */
+HBStateFormatter -> work time format */
 " (ETA %@)" = " (ETA %@)";
 
 /* HBJob -> video short description framerate */
@@ -48,7 +51,7 @@
 ", Web Optimized" = ", Web-optimiert";
 
 /* HBStateFormatter -> work pass type format */
-"(subtitle scan)" = "(Untertitelscan)";
+"(subtitle scan)" = "(Untertitel einlesen)";
 
 /* Title short description -> video format */
 "%.6g FPS" = "%.6g BpS";
@@ -64,6 +67,9 @@
 
 /* HBPicture -> short info */
 "%@Output: %dx%d, Anamorphic: %dx%d Custom" = "%1$@Anzeige: %2$dx%3$d, Anamorph: %4$dx%5$d Eigene";
+
+/* HBPicture -> short non anamorphic info */
+"%dx%d" = "%1$dx%2$d";
 
 /* HBPicture -> short info */
 "%dx%d Storage, %dx%d Display" = "%1$d x %2$d Original, %3$d x %4$d Anzeige";
@@ -82,12 +88,6 @@
 
 /* Title description */
 "1 Foreign Language Search Pass - " = "1 Fremdsprachensuche-Durchgang – ";
-
-/* Title description */
-"2 Video Passes" = "2 Videodurchgänge";
-
-/* Title description */
-"2 Video Passes First Turbo" = "2 Videodurchgänge, erster beschleunigt";
 
 /* HBAudio -> Mixdown */
 "5.1 Channels" = "5.1 Kanäle";
@@ -117,7 +117,7 @@
 "Bwdif" = "Bwdif";
 
 /* Title -> chapter name
-   Title description */
+Title description */
 "Chapter %d" = "Kapitel %d";
 
 /* HBJob -> chapters short description */
@@ -130,11 +130,11 @@
 "Chapters %d through %d" = "Kapitel %1$d bis %2$d";
 
 /* Filters description
-   HBJob -> filters short description */
+HBJob -> filters short description */
 "Chroma Smooth" = "Chroma-Glättung";
 
 /* Filters description
-   HBJob -> filters short description */
+HBJob -> filters short description */
 "Colorspace" = "Farbraum";
 
 /* HBJob -> filters short description */
@@ -147,24 +147,25 @@
 "CRF" = "CRF";
 
 /* HBFilters -> custom display name
-   HBPicture -> summary */
+HBPicture -> summary */
 "Custom" = "Eigene";
 
 /* Filters description
-   HBJob -> filters short description */
+HBJob -> filters short description */
 "Deblock" = "Deblock";
 
 /* HBFilters -> filter display name */
 "Decomb" = "Decomb";
 
-/* Subtitles description */
+/* HBFilters -> default display name
+Subtitles description */
 "Default" = "Standard";
 
 /* Video description */
 "default settings" = "Standardeinstellungen";
 
 /* HBFilters -> invalid filter custom settings error recovery suggestion */
-"Default: " = "Standard";
+"Default: " = "Standard:";
 
 /* Filters description */
 "Denoise" = "Entrauschen";
@@ -173,7 +174,7 @@
 "Destination:" = "Ausgabe:";
 
 /* Dimensions description
-   HBJob -> filters short description */
+HBJob -> filters short description */
 "Detelecine" = "Detelecine";
 
 /* Dimensions description */
@@ -219,7 +220,7 @@
 "Gain: %.2f" = "Verstärkung: %.2f";
 
 /* Filters description
-   HBJob -> filters short description */
+HBJob -> filters short description */
 "Grayscale" = "Graustufen";
 
 /* HBFilters -> filter display name */
@@ -285,6 +286,12 @@
 /* HBAudio -> Mixdown */
 "Mono (Right Only)" = "Mono (Nur rechts)";
 
+/* Title description */
+"Multi Passes" = "Mehrere Durchgänge";
+
+/* Title description */
+"Multi Passes Turbo" = "Mehrere Durchgänge beschleunigen";
+
 /* HBStateFormatter -> pass display name */
 "Muxing…" = "Multiplexen …";
 
@@ -295,13 +302,13 @@
 "none" = "Keine";
 
 /* HBAudio -> Mixdown
-   HBAudio -> none track name
-   HBJob -> filters short description
-   HBSubtitles -> none track name */
+HBAudio -> none track name
+HBJob -> filters short description
+HBSubtitles -> none track name */
 "None" = "Ohne";
 
 /* HBFilters -> filter display name
-   HBFilters -> off display name */
+HBFilters -> off display name */
 "Off" = "Aus";
 
 /* Video description */
@@ -347,10 +354,10 @@
 "Same as source (variable)" = "Wie die Quelle (variabel)";
 
 /* HBStateFormatter -> scan pass format */
-"Scanning title %d of %d, preview %d…" = "Titel %1$d von %2$d überprüfen, Vorschau  %3$d …";
+"Scanning title %d of %d, preview %d…" = "Titel %1$d von %2$d einlesen, Vorschau  %3$d …";
 
 /* HBStateFormatter -> scan pass format */
-"Scanning title %d of %d…" = "Titel %1$d von %2$d überprüfen …";
+"Scanning title %d of %d…" = "Titel %1$d von %2$d einlesen …";
 
 /* HBStateFormatter -> search pass display name */
 "Searching for start point:  %.2f %%" = "Nach Startpunkt suchen: %.2f %%";
@@ -403,11 +410,15 @@
 /* Title description */
 "Title %d, %@, %@" = "Titel %1$d, %2$@, %3$@";
 
+/* Audio track title description
+Subtitles track title description */
+"Title: %@" = "Titel: %@";
+
 /* Video description */
 "Tune: " = "Abstimmung: ";
 
 /* HBJob -> video short description encoder name
-   Video description */
+Video description */
 "Unknown" = "Unbekannt";
 
 /* HBFilters -> filter display name */

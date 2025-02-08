@@ -22,7 +22,7 @@
 #import "HBLocalizationUtilities.h"
 
 #import "HBRange.h"
-#import "HBVideo.h"
+#import "HBVideo+UIAdditions.h"
 #import "HBPicture.h"
 #import "HBFilters.h"
 #import "HBAudio.h"
@@ -166,15 +166,15 @@ static HBMixdownTransformer    *mixdownTransformer;
     {
         [passesString appendString:HBKitLocalizedString(@"1 Foreign Language Search Pass - ", @"Title description")];
     }
-    if (self.video.qualityType != 1 && self.video.twoPass == YES)
+    if (self.video.multiPassSupported && self.video.multiPass == YES)
     {
-        if (self.video.turboTwoPass == YES)
+        if (self.video.turboMultiPass == YES)
         {
-            [passesString appendString:HBKitLocalizedString(@"2 Video Passes First Turbo", @"Title description")];
+            [passesString appendString:HBKitLocalizedString(@"Multi Passes Turbo", @"Title description")];
         }
         else
         {
-            [passesString appendString:HBKitLocalizedString(@"2 Video Passes", @"Title description")];
+            [passesString appendString:HBKitLocalizedString(@"Multi Passes", @"Title description")];
         }
     }
 
@@ -248,7 +248,7 @@ static HBMixdownTransformer    *mixdownTransformer;
         [options appendString:HBKitLocalizedString(@", Chapter Markers", @"Format description")];
     }
 
-    if ((self.container & HB_MUX_MASK_MP4) && self.mp4HttpOptimize)
+    if ((self.container & HB_MUX_MASK_MP4) && self.optimize)
     {
         [options appendString:HBKitLocalizedString(@", Web Optimized", @"Format description")];
     }
@@ -635,6 +635,12 @@ static HBMixdownTransformer    *mixdownTransformer;
                 }
             }
 
+            if (audioTrack.title.length)
+            {
+                [detailString appendString:@", "];
+                [detailString appendFormat:HBKitLocalizedString(@"Title: %@", @"Audio track title description"), audioTrack.title];
+            }
+
             [attrString appendString:@"\t" withAttributes: detailAttr];
             if (secondLine)
             {
@@ -670,6 +676,12 @@ static HBMixdownTransformer    *mixdownTransformer;
 
             // remember that index 0 of Subtitles can contain "Foreign Audio Search
             [detailString appendString:self.subtitles.sourceTracks[track.sourceTrackIdx].displayName];
+
+            if (track.title.length)
+            {
+                [detailString appendString:@", "];
+                [detailString appendFormat:HBKitLocalizedString(@"Title: %@", @"Subtitles track title description"), track.title];
+            }
 
             if (track.forcedOnly)
             {
@@ -809,6 +821,7 @@ static HBMixdownTransformer    *mixdownTransformer;
     {
         if (audioTrack.isEnabled)
         {
+            [info appendFormat: @"%lu: ", (unsigned long)audioTrack.sourceTrackIdx - 1];
             const char *encoder = hb_audio_encoder_get_name(audioTrack.encoder);
             if (encoder)
             {
@@ -828,7 +841,8 @@ static HBMixdownTransformer    *mixdownTransformer;
             [info appendString:@"\n"];
         }
 
-        if (index == 1) {
+        if (index == 1)
+        {
             break;
         }
         index += 1;

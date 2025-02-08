@@ -1,6 +1,6 @@
 /* hbavfilter.h
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -30,7 +30,7 @@ int     hb_avfilter_add_frame(hb_avfilter_graph_t * graph, AVFrame * frame);
 
 int     hb_avfilter_get_frame(hb_avfilter_graph_t * graph, AVFrame * frame);
 
-int     hb_avfilter_add_buf(hb_avfilter_graph_t * graph, hb_buffer_t * in);
+int     hb_avfilter_add_buf(hb_avfilter_graph_t * graph, hb_buffer_t ** in);
 
 hb_buffer_t *
 hb_avfilter_get_buf(hb_avfilter_graph_t * graph);

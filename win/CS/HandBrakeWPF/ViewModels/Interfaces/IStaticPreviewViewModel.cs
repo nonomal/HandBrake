@@ -22,9 +22,11 @@ namespace HandBrakeWPF.ViewModels.Interfaces
     {
         bool IsOpen { get; set; }
 
+        bool ShowPictureSettingControls { get; set; }
+
         BitmapSource PreviewImage { get; }
 
-        void UpdatePreviewFrame(EncodeTask task, Source scannedSource);
+        void UpdatePreviewFrame(Title title, EncodeTask task, Source scannedSource);
 
         void PreviousPreview();
 

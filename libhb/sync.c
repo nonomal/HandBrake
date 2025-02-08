@@ -1,7 +1,6 @@
 /* sync.c
 
-   Copyright (c) 2003-2022 HandBrake Team
-   Copyright 2022 NVIDIA Corporation
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -12,13 +11,10 @@
 #include "handbrake/hbffmpeg.h"
 #include <stdio.h>
 #include "handbrake/audio_resample.h"
+#include "handbrake/hwaccel.h"
 
 #if HB_PROJECT_FEATURE_QSV
 #include "handbrake/qsv_common.h"
-#endif
-
-#if HB_PROJECT_FEATURE_NVENC
-#include "handbrake/nvenc_common.h"
 #endif
 
 #define SYNC_MAX_VIDEO_QUEUE_LEN    40
@@ -393,21 +389,42 @@ static hb_buffer_t * CreateBlackBuf( sync_stream_t * stream,
             buf->f.color_matrix = stream->common->job->title->color_matrix;
             buf->f.color_range = stream->common->job->color_range;
             buf->f.chroma_location = stream->common->job->chroma_location;
-#if HB_PROJECT_FEATURE_QSV
-            if (hb_qsv_full_path_is_enabled(stream->common->job) && !hb_qsv_hw_filters_are_enabled(stream->common->job))
+
+            // Dolby Vision requires a RPU on every buffer, attach the first
+            // found during scan in the absence of something better
+            if (stream->common->job->title->initial_rpu)
             {
-                hb_qsv_attach_surface_to_video_buffer(stream->common->job, buf, 0);
+                hb_data_t *rpu = stream->common->job->title->initial_rpu;
+                AVBufferRef *ref = av_buffer_alloc(rpu->size);
+                memcpy(ref->data, rpu->bytes, rpu->size);
+
+                AVFrameSideData *sd_dst = NULL;
+                sd_dst = hb_buffer_new_side_data_from_buf(buf, stream->common->job->title->initial_rpu_type, ref);
+
+                if (!sd_dst)
+                {
+                    av_buffer_unref(&ref);
+                }
             }
+
+#if HB_PROJECT_FEATURE_QSV
+            if (hb_qsv_get_memory_type(stream->common->job) == MFX_IOPATTERN_OUT_VIDEO_MEMORY)
+            {
+                buf = hb_qsv_copy_video_buffer_to_hw_video_buffer(stream->common->job, buf, hb_qsv_hw_filters_via_video_memory_are_enabled(stream->common->job));
+            }
+            else
 #endif
+            if (hb_hwaccel_is_full_hardware_pipeline_enabled(stream->common->job))
+            {
+                buf = hb_hwaccel_copy_video_buffer_to_hw_video_buffer(stream->common->job, &buf);
+            }
         }
         else
         {
 #if HB_PROJECT_FEATURE_QSV
-            if (hb_qsv_full_path_is_enabled(stream->common->job) && !hb_qsv_hw_filters_are_enabled(stream->common->job))
+            if (hb_qsv_get_memory_type(stream->common->job) == MFX_IOPATTERN_OUT_VIDEO_MEMORY)
             {
-                hb_buffer_t *temp = hb_buffer_dup(buf);
-                hb_qsv_copy_video_buffer_to_video_buffer(stream->common->job, buf, temp, 0);
-                buf = temp;
+                buf = hb_qsv_buffer_dup(stream->common->job, buf, hb_qsv_hw_filters_via_video_memory_are_enabled(stream->common->job));
             }
             else
 #endif
@@ -421,23 +438,8 @@ static hb_buffer_t * CreateBlackBuf( sync_stream_t * stream,
         buf->s.duration  = frame_dur;
         duration        -= frame_dur;
         hb_buffer_list_append(&list, buf);
-
-#if HB_PROJECT_FEATURE_NVENC
-        if (hb_nvdec_is_enabled(stream->common->job))
-        {
-            AVFrame frame = {{0}};
-            hb_video_buffer_to_avframe(&frame, buf);
-
-            if (!buf->hw_ctx.frame)
-            {
-                hb_nvdec_hwframe_init(stream->common->job, (AVFrame**)&buf->hw_ctx.frame);
-            }
-
-            av_frame_copy_props(buf->hw_ctx.frame, &frame);
-            av_hwframe_transfer_data(buf->hw_ctx.frame, &frame, 0);
-        }
-#endif
     }
+
     if (buf != NULL)
     {
         if (buf->s.stop < pts + dur)
@@ -1179,9 +1181,12 @@ static void fixSubtitleOverlap( sync_stream_t * stream )
         // marker to indicate the end of a subtitle
         return;
     }
-    // Only SSA subs can overlap
+    // Theoretically only SSA subs can overlap,
+    // but there are some SRT subs out there with
+    // overlapping samples, so let's try to preserve them too
     if (stream->subtitle.subtitle->source      != SSASUB &&
         stream->subtitle.subtitle->source      != IMPORTSSA &&
+        stream->subtitle.subtitle->source      != IMPORTSRT &&
         stream->subtitle.subtitle->config.dest == PASSTHRUSUB &&
         buf->s.start <= stream->last_pts)
     {
@@ -2371,7 +2376,7 @@ static int syncVideoInit( hb_work_object_t * w, hb_job_t * job)
     w->fifo_in                  = job->fifo_raw;
     w->fifo_out                 = job->fifo_sync;
 
-    if (job->pass_id == HB_PASS_ENCODE_2ND)
+    if (job->pass_id == HB_PASS_ENCODE_FINAL)
     {
         /* We already have an accurate frame count from pass 1 */
         hb_interjob_t * interjob = hb_interjob_get(job->h);
@@ -2532,7 +2537,7 @@ static void syncVideoClose( hb_work_object_t * w )
     }
 
     /* save data for second pass */
-    if( job->pass_id == HB_PASS_ENCODE_1ST )
+    if( job->pass_id == HB_PASS_ENCODE_ANALYSIS )
     {
         /* Preserve frame count for better accuracy in pass 2 */
         hb_interjob_t * interjob = hb_interjob_get( job->h );
@@ -3210,14 +3215,23 @@ static void UpdateState( sync_common_t * common, int frame_count )
                             (common->st_dates[3]  - common->st_dates[0]);
     if (hb_get_date() > common->st_first + 4000)
     {
-        int eta;
         p.rate_avg = 1000.0 * common->st_counts[3] /
                      (common->st_dates[3] - common->st_first - job->st_paused);
-        eta = (common->est_frame_count - common->st_counts[3]) / p.rate_avg;
-        p.eta_seconds = eta;
-        p.hours       = eta / 3600;
-        p.minutes     = (eta % 3600) / 60;
-        p.seconds     = eta % 60;
+        if (common->est_frame_count >= common->st_counts[3])
+        {
+            int eta = (common->est_frame_count - common->st_counts[3]) / p.rate_avg;
+            p.eta_seconds = eta;
+            p.hours       = eta / 3600;
+            p.minutes     = (eta % 3600) / 60;
+            p.seconds     = eta % 60;
+        }
+        else
+        {
+            p.eta_seconds = 0;
+            p.hours    = -1;
+            p.minutes  = -1;
+            p.seconds  = -1;
+        }
     }
     else
     {

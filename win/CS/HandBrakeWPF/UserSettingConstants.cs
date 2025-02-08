@@ -9,6 +9,8 @@
 
 namespace HandBrakeWPF
 {
+    using System;
+
     /// <summary>
     /// Constants for the User Settings Service
     /// </summary>
@@ -21,11 +23,11 @@ namespace HandBrakeWPF
         public const string AutoNaming = "autoNaming";
         public const string ClearOldLogs = "clearOldLogs";
         public const string DaysBetweenUpdateCheck = "daysBetweenUpdateCheck";
-        public const string DefaultPlayer = "defaultPlayer";
+        public const string UseExternalPlayer = "previewUseExternalPlayer";
         public const string LastUpdateCheckDate = "lastUpdateCheckDate";
         public const string MainWindowMinimize = "MainWindowMinimize";
         public const string UpdateStatus = "updateStatus";
-        public const string UseM4v = "useM4v";
+        public const string UseM4v = "m4vExtensionMode";
         public const string MediaPlayerPath = "VLC_Path";
         public const string InstanceId = "InstanceId";
         public const string X264Step = "X264Step";
@@ -34,6 +36,9 @@ namespace HandBrakeWPF
         public const string SendFile = "SendFile";
         public const string SendFileTo = "SendFileTo";
         public const string SendFileToArgs = "SendFileToArgs";
+        public const string QueueDoneCustomActionEnabled = "QueueDoneCustomActionEnabled";
+        public const string QueueDoneAction = "QueueDoneAction";
+        public const string QueueDoneArguments = "QueueDoneArguments";
         public const string PreventSleep = "PreventSleep";
         public const string PauseOnLowDiskspace = "PauseOnLowDiskspace";
         public const string PauseQueueOnLowDiskspaceLevel = "LowDiskSpaceWarningLevelInBytes";
@@ -46,6 +51,8 @@ namespace HandBrakeWPF
         public const string PreviewScanCount = "previewScanCount";
         public const string Verbosity = "Verbosity";
         public const string MinScanDuration = "MinTitleScanDuration";
+        public const string MaxScanDuration = "MaxTitleScanDuration";
+        public const string KeepDuplicateTitles = "KeepDuplicateTitles";
         public const string ProcessPriorityInt = "ProcessPriorityInt";
         public const string SaveLogToCopyDirectory = "SaveLogToCopyDirectory";
         public const string SaveLogWithVideo = "SaveLogWithVideo";
@@ -60,10 +67,8 @@ namespace HandBrakeWPF
         public const string WhenDoneAudioFile = "WhenDoneAudioFile";
         public const string ProcessIsolationEnabled = "ProcessIsolationEnabled";
         public const string ProcessIsolationPort = "ProcessIsolationPort";
-        public const string EnableQuickSyncEncoding = "EnableQuickSyncEncoding";
         public const string EnableQuickSyncHyperEncode = "EnableQuickSyncHyperEncode";
-        public const string EnableVceEncoder = "EnableVceEncoder";
-        public const string EnableNvencEncoder = "EnableNvencEncoder";
+        public const string EnableDirectXDecoding = "EnableDirectXDecoding";
         public const string UiLanguage = "UiLanguage";
         public const string ShowAddAllToQueue = "ShowAddAllToQueue";
         public const string ShowAddSelectionToQueue = "ShowAddSelectionToQueue";
@@ -87,5 +92,15 @@ namespace HandBrakeWPF
         public const string ForceDisableHardwareSupport = "ForceDisableHardwareSupport";
         public const string IsUpdateAvailableBuild = "IsUpdateAvailableBuild";
         public const string EnableNvDecSupport = "EnableNvDecSupport";
+        public const string UseIsoDateFormat = "UseIsoDateFormat";
+        public const string ExtendedQueueDisplay = "ExtendedQueueDisplay";
+        public const string HardwareDetectTimeoutSeconds = "HardwareDetectTimeoutSeconds";
+        public const string ShowPresetDesc = "ShowPresetDescription";
+        public const string ExcludedExtensions = "ExcludedFileExtensions";
+        public static string RecursiveFolderScan = "RecursiveFolderScan";
+        public static string SimpleQueueView = "SimpleQueueView";
+        public static string IsLegacyMenuShown = "IsLegacyMenuShown";
+        public static string DefaultRangeMode = "DefaultRangeMode";
+
     }
 }

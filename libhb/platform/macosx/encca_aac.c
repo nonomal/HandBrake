@@ -1,6 +1,6 @@
 /* encca_aac.c
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -10,6 +10,8 @@
 #include "handbrake/handbrake.h"
 #include "handbrake/audio_remap.h"
 #include "handbrake/hbffmpeg.h"
+#include "handbrake/extradata.h"
+
 #include <AudioToolbox/AudioToolbox.h>
 #include <CoreAudio/CoreAudio.h>
 
@@ -312,17 +314,20 @@ int encCoreAudioInit(hb_work_object_t *w, hb_job_t *job, enum AAC_MODE mode)
     pv->omaxpacket = tmp;
 
     // get magic cookie (elementary stream descriptor)
-    tmp = HB_CONFIG_MAX_SIZE;
+    AudioConverterGetPropertyInfo(pv->converter,
+                                  kAudioConverterCompressionMagicCookie,
+                                  &tmpsiz, NULL);
+    UInt8 *magicCookie = malloc(tmpsiz);
     AudioConverterGetProperty(pv->converter,
                               kAudioConverterCompressionMagicCookie,
-                              &tmp, w->config->extradata.bytes);
+                              &tmpsiz, magicCookie);
     // CoreAudio returns a complete ESDS, but we only need
     // the DecoderSpecific info.
-    UInt8* buffer = NULL;
-    ReadESDSDescExt(w->config->extradata.bytes, &buffer, &tmpsiz, 0);
-    w->config->extradata.length = tmpsiz;
-    memmove(w->config->extradata.bytes, buffer, w->config->extradata.length);
+    UInt8 *buffer = NULL;
+    ReadESDSDescExt(magicCookie, &buffer, &tmpsiz, 0);
+    hb_set_extradata(w->extradata, buffer, tmpsiz);
     free(buffer);
+    free(magicCookie);
 
     AudioConverterPrimeInfo primeInfo;
     UInt32 piSize = sizeof(primeInfo);
@@ -332,7 +337,7 @@ int encCoreAudioInit(hb_work_object_t *w, hb_job_t *job, enum AAC_MODE mode)
                               &piSize, &primeInfo);
 
     pv->delay = primeInfo.leadingFrames * 90000LL / pv->osamplerate;
-    w->config->init_delay = pv->delay;
+    *w->init_delay = pv->delay;
 
     pv->list = hb_list_init();
     pv->buf = NULL;
@@ -433,10 +438,9 @@ static hb_buffer_t* Encode(hb_work_object_t *w)
     hb_work_private_t *pv = w->private_data;
     UInt32 npackets = 1;
 
-    /* check if we need more data or we have already got to EOF
-       if so, we need to call the audio converter again even
-       without data to get out the remaining packets.
-     */
+    // Check if we need more data or we have already got to EOF
+    // if so, we need to call the audio converter again even
+    // without data to get out the remaining packets.
     if (pv->input_done != 1 &&
         (pv->ibytes = hb_list_bytes(pv->list)) < pv->isamples * pv->isamplesiz)
     {
@@ -485,11 +489,16 @@ static hb_buffer_t* Encode(hb_work_object_t *w)
 
 static void Flush(hb_work_object_t *w, hb_buffer_list_t * list)
 {
-    hb_buffer_t *buf = Encode(w);
-    while (buf)
+    // Nothing to flush if all we got was a EOF
+    if (w->private_data->first_pts == AV_NOPTS_VALUE)
+    {
+        return;
+    }
+
+    hb_buffer_t *buf;
+    while ((buf = Encode(w)))
     {
         hb_buffer_list_append(list, buf);
-        buf = Encode(w);
     }
 }
 
@@ -525,11 +534,9 @@ int encCoreAudioWork(hb_work_object_t *w, hb_buffer_t **buf_in,
     hb_list_add(pv->list, in);
     *buf_in = NULL;
 
-    buf = Encode(w);
-    while (buf)
+    while ((buf = Encode(w)))
     {
         hb_buffer_list_append(&list, buf);
-        buf = Encode(w);
     }
 
     *buf_out = hb_buffer_list_clear(&list);

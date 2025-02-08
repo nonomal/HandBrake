@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # mac-toolchain-build - download and build common macOS toolchain components
 #
-# Copyright 2022 Bradley Sepos
+# Copyright 2025 Bradley Sepos
 # Released under the MIT License. See LICENSE for details.
 # https://github.com/bradleysepos/mac-toolchain-build
 
@@ -141,7 +141,8 @@ function mac_toolchain_build {
     set -o pipefail
 
     # package names
-    local AUTOCONF_NAME AUTOMAKE_NAME CMAKE_NAME LIBTOOL_NAME MESON_NAME NASM_NAME NINJA_NAME PKGCONFIG_NAME NAMES
+    local M4_NAME AUTOCONF_NAME AUTOMAKE_NAME CMAKE_NAME LIBTOOL_NAME MESON_NAME NASM_NAME NINJA_NAME OPENSSL_NAME PKGCONFIG_NAME NAMES
+    M4_NAME="m4"
     AUTOCONF_NAME="autoconf"
     AUTOMAKE_NAME="automake"
     CMAKE_NAME="cmake"
@@ -149,23 +150,27 @@ function mac_toolchain_build {
     MESON_NAME="meson"
     NASM_NAME="nasm"
     NINJA_NAME="ninja"
+    OPENSSL_NAME="openssl"
     PKGCONFIG_NAME="pkg-config"
-    NAMES=("${AUTOCONF_NAME}" "${AUTOMAKE_NAME}" "${CMAKE_NAME}" "${LIBTOOL_NAME}" "${MESON_NAME}" "${NASM_NAME}" "${NINJA_NAME}" "${PKGCONFIG_NAME}")
+    NAMES=("${M4_NAME}" "${AUTOCONF_NAME}" "${AUTOMAKE_NAME}" "${CMAKE_NAME}" "${LIBTOOL_NAME}" "${MESON_NAME}" "${NASM_NAME}" "${NINJA_NAME}" "${OPENSSL_NAME}" "${PKGCONFIG_NAME}")
 
     # versions
-    local AUTOCONF_VER AUTOMAKE_VER CMAKE_VER LIBTOOL_VER MESON_VER NASM_VER NINJA_VER PKGCONFIG_VER VERSIONS
-    AUTOCONF_VER="2.71"
-    AUTOMAKE_VER="1.16.5"
-    CMAKE_VER="3.23.0"
-    LIBTOOL_VER="2.4.7"
-    MESON_VER="0.61.4"
-    NASM_VER="2.15.05"
-    NINJA_VER="1.10.2"
+    local M4_VER AUTOCONF_VER AUTOMAKE_VER CMAKE_VER LIBTOOL_VER MESON_VER NASM_VER NINJA_VER OPENSSL_VER PKGCONFIG_VER VERSIONS
+    M4_VER="1.4.19"
+    AUTOCONF_VER="2.72"
+    AUTOMAKE_VER="1.17"
+    CMAKE_VER="3.30.5"
+    LIBTOOL_VER="2.5.4"
+    MESON_VER="1.6.0"
+    NASM_VER="2.16.03"
+    NINJA_VER="1.12.1"
+    OPENSSL_VER="3.4.0"
     PKGCONFIG_VER="0.29.2"
-    VERSIONS=("${AUTOCONF_VER}" "${AUTOMAKE_VER}" "${CMAKE_VER}" "${LIBTOOL_VER}" "${MESON_VER}" "${NASM_VER}" "${NINJA_VER}" "${PKGCONFIG_VER}")
+    VERSIONS=("${M4_VER}" "${AUTOCONF_VER}" "${AUTOMAKE_VER}" "${CMAKE_VER}" "${LIBTOOL_VER}" "${MESON_VER}" "${NASM_VER}" "${NINJA_VER}" "${OPENSSL_VER}" "${PKGCONFIG_VER}")
 
     # filenames
-    local AUTOCONF_PKG AUTOMAKE_PKG CMAKE_PKG LIBTOOL_PKG MESON_PKG NASM_PKG NINJA_PKG PKGCONFIG_PKG PKGS
+    local M4_PKG AUTOCONF_PKG AUTOMAKE_PKG CMAKE_PKG LIBTOOL_PKG MESON_PKG NASM_PKG NINJA_PKG OPENSSL_PKG PKGCONFIG_PKG PKGS
+    M4_PKG="m4-${M4_VER}.tar.bz2"
     AUTOCONF_PKG="autoconf-${AUTOCONF_VER}.tar.gz"
     AUTOMAKE_PKG="automake-${AUTOMAKE_VER}.tar.gz"
     CMAKE_PKG="cmake-${CMAKE_VER}.tar.gz"
@@ -173,11 +178,13 @@ function mac_toolchain_build {
     MESON_PKG="meson-${MESON_VER}.tar.gz"
     NASM_PKG="nasm-${NASM_VER}.tar.bz2"
     NINJA_PKG="ninja-${NINJA_VER}.tar.gz"
+    OPENSSL_PKG="openssl-openssl-${OPENSSL_VER}.tar.gz"
     PKGCONFIG_PKG="pkg-config-${PKGCONFIG_VER}.tar.gz"
-    PKGS=("${AUTOCONF_PKG}" "${AUTOMAKE_PKG}" "${CMAKE_PKG}" "${LIBTOOL_PKG}" "${MESON_PKG}" "${NASM_PKG}" "${NINJA_PKG}" "${PKGCONFIG_PKG}")
+    PKGS=("${M4_PKG}" "${AUTOCONF_PKG}" "${AUTOMAKE_PKG}" "${CMAKE_PKG}" "${LIBTOOL_PKG}" "${MESON_PKG}" "${NASM_PKG}" "${NINJA_PKG}" "${OPENSSL_PKG}" "${PKGCONFIG_PKG}")
 
     # urls
-    local AUTOCONF_URLS AUTOMAKE_URLS CMAKE_URLS LIBTOOL_URLS MESON_URLS NASM_URLS NINJA_URLS PKGCONFIG_URLS URLS_VARNAMES
+    local M4_URLS AUTOCONF_URLS AUTOMAKE_URLS CMAKE_URLS LIBTOOL_URLS MESON_URLS NASM_URLS NINJA_URLS OPENSSL_URLS PKGCONFIG_URLS URLS_VARNAMES
+    M4_URLS=("https://ftp.gnu.org/gnu/m4/m4-${M4_VER}.tar.bz2")
     AUTOCONF_URLS=("https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VER}.tar.gz")
     AUTOMAKE_URLS=("https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VER}.tar.gz")
     CMAKE_URLS=("https://cmake.org/files/v${CMAKE_VER%.*}/cmake-${CMAKE_VER}.tar.gz")
@@ -185,25 +192,28 @@ function mac_toolchain_build {
     MESON_URLS=("https://github.com/mesonbuild/meson/archive/${MESON_VER}.tar.gz")
     NASM_URLS=("https://www.nasm.us/pub/nasm/releasebuilds/${NASM_VER}/nasm-${NASM_VER}.tar.bz2")
     NINJA_URLS=("https://github.com/ninja-build/ninja/archive/v${NINJA_VER}.tar.gz")
+    OPENSSL_URLS=("https://github.com/openssl/openssl/archive/openssl-${OPENSSL_VER}.tar.gz")
     PKGCONFIG_URLS=("https://pkg-config.freedesktop.org/releases/pkg-config-${PKGCONFIG_VER}.tar.gz")
-    URLS_VARNAMES=('AUTOCONF_URLS' 'AUTOMAKE_URLS' 'CMAKE_URLS' 'LIBTOOL_URLS' 'MESON_URLS' 'NASM_URLS' 'NINJA_URLS' 'PKGCONFIG_URLS')
+    URLS_VARNAMES=('M4_URLS' 'AUTOCONF_URLS' 'AUTOMAKE_URLS' 'CMAKE_URLS' 'LIBTOOL_URLS' 'MESON_URLS' 'NASM_URLS' 'NINJA_URLS' 'OPENSSL_URLS' 'PKGCONFIG_URLS')
 
     # checksums
-    local AUTOCONF_SHA256 AUTOMAKE_SHA256 CMAKE_SHA256 LIBTOOL_SHA256 MESON_SHA256 NASM_SHA256 NINJA_SHA256 PKGCONFIG_SHA256 CHECKSUMS
-    AUTOCONF_SHA256="431075ad0bf529ef13cb41e9042c542381103e80015686222b8a9d4abef42a1c"
-    AUTOMAKE_SHA256="07bd24ad08a64bc17250ce09ec56e921d6343903943e99ccf63bbf0705e34605"
-    CMAKE_SHA256="5ab0a12f702f44013be7e19534cd9094d65cc9fe7b2cd0f8c9e5318e0fe4ac82"
-    LIBTOOL_SHA256="04e96c2404ea70c590c546eba4202a4e12722c640016c12b9b2f1ce3d481e9a8"
-    MESON_SHA256="c9cc34bcb15c19cfd5ee0d7b07111152701f602db2b59ef6b63d3628e0bbe719"
-    NASM_SHA256="3c4b8339e5ab54b1bcb2316101f8985a5da50a3f9e504d43fa6f35668bee2fd0"
-    NINJA_SHA256="ce35865411f0490368a8fc383f29071de6690cbadc27704734978221f25e2bed"
+    local M4_SHA256 AUTOCONF_SHA256 AUTOMAKE_SHA256 CMAKE_SHA256 LIBTOOL_SHA256 MESON_SHA256 NASM_SHA256 NINJA_SHA256 OPENSSL_SHA256 PKGCONFIG_SHA256 CHECKSUMS
+    M4_SHA256="b306a91c0fd93bc4280cfc2e98cb7ab3981ff75a187bea3293811f452c89a8c8"
+    AUTOCONF_SHA256="afb181a76e1ee72832f6581c0eddf8df032b83e2e0239ef79ebedc4467d92d6e"
+    AUTOMAKE_SHA256="397767d4db3018dd4440825b60c64258b636eaf6bf99ac8b0897f06c89310acd"
+    CMAKE_SHA256="9f55e1a40508f2f29b7e065fa08c29f82c402fa0402da839fffe64a25755a86d"
+    LIBTOOL_SHA256="da8ebb2ce4dcf46b90098daf962cffa68f4b4f62ea60f798d0ef12929ede6adf"
+    MESON_SHA256="342300656bfdafb6cc09325bdd0fd507366ecaa6be25fa4525f50889adf7c606"
+    NASM_SHA256="bef3de159bcd61adf98bb7cc87ee9046e944644ad76b7633f18ab063edb29e57"
+    NINJA_SHA256="821bdff48a3f683bc4bb3b6f0b5fe7b2d647cf65d52aeb63328c91a6c6df285a"
+    OPENSSL_SHA256="1ca043a26fbea74cdf7faf623a6f14032a01117d141c4a5208ccac819ccc896b"
     PKGCONFIG_SHA256="6fc69c01688c9458a57eb9a1664c9aba372ccda420a02bf4429fe610e7e7d591"
-    CHECKSUMS=("${AUTOCONF_SHA256}" "${AUTOMAKE_SHA256}" "${CMAKE_SHA256}" "${LIBTOOL_SHA256}" "${MESON_SHA256}" "${NASM_SHA256}" "${NINJA_SHA256}" "${PKGCONFIG_SHA256}")
+    CHECKSUMS=("${M4_SHA256}" "${AUTOCONF_SHA256}" "${AUTOMAKE_SHA256}" "${CMAKE_SHA256}" "${LIBTOOL_SHA256}" "${MESON_SHA256}" "${NASM_SHA256}" "${NINJA_SHA256}" "${OPENSSL_SHA256}" "${PKGCONFIG_SHA256}")
 
     # internal vars
     local NAME VERSION SELF SELF_NAME HELP SUDO TOTAL
     NAME="mac-toolchain-build"
-    VERSION="2.8.0"
+    VERSION="2.12.0"
     SELF="${BASH_SOURCE[0]}"
     SELF_NAME=$(basename "${SELF}")
     HELP="\
@@ -504,8 +514,24 @@ default install-dir: /usr/local"
     local INDEX
     export PATH="${PREFIX}/bin${PATH:+:$PATH}"
 
-    # autoconf
+    # m4
     INDEX=0
+    printf "Building    [%02i/%02i] %s " "$((INDEX+1))" "${TOTAL}" "${NAMES[$INDEX]} ${VERSIONS[$INDEX]}"
+    if [[ "${SKIP[$INDEX]}" == true ]]; then
+        echo "(${INSTALLED_VERSIONS[$INDEX]} installed, skipping)"
+    else
+        [[ "${SUDO}" != "" ]] && ${SUDO} -v
+        touch "${BUILD_DIR}/${NAMES[$INDEX]}.log"
+        mkdir -pv "${BUILD_DIR}/${NAMES[$INDEX]}" > "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
+        cd "${BUILD_DIR}/${NAMES[$INDEX]}"
+        "${SOURCE_DIR}/${NAMES[$INDEX]}/${PKGS[$INDEX]%\.tar\.*}/configure" --prefix="${PREFIX}" >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
+        make -j "${JOBS}" >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
+        ${SUDO} make install >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
+        echo ""
+    fi
+
+    # autoconf
+    INDEX=$((INDEX+1))
     printf "Building    [%02i/%02i] %s " "$((INDEX+1))" "${TOTAL}" "${NAMES[$INDEX]} ${VERSIONS[$INDEX]}"
     if [[ "${SKIP[$INDEX]}" == true ]]; then
         echo "(${INSTALLED_VERSIONS[$INDEX]} installed, skipping)"
@@ -598,7 +624,7 @@ default install-dir: /usr/local"
         touch "${BUILD_DIR}/${NAMES[$INDEX]}.log"
         mkdir -pv "${BUILD_DIR}/${NAMES[$INDEX]}" > "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
         cd "${BUILD_DIR}/${NAMES[$INDEX]}"
-        "${SOURCE_DIR}/${NAMES[$INDEX]}/${PKGS[$INDEX]%\.tar\.*}/configure" --prefix="${PREFIX}" --enable-sections --enable-lto >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
+        "${SOURCE_DIR}/${NAMES[$INDEX]}/${PKGS[$INDEX]%\.tar\.*}/configure" --prefix="${PREFIX}" >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
         make -j "${JOBS}" AR=ar RANLIB=ranlib >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
         ${SUDO} make install >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
         echo ""
@@ -614,8 +640,24 @@ default install-dir: /usr/local"
         touch "${BUILD_DIR}/${NAMES[$INDEX]}.log"
         mkdir -pv "${BUILD_DIR}/${NAMES[$INDEX]}" > "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
         cd "${BUILD_DIR}/${NAMES[$INDEX]}"
-        "${SOURCE_DIR}/${NAMES[$INDEX]}/${PKGS[$INDEX]%\.tar\.*}/configure.py" --bootstrap >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
+        python3 "${SOURCE_DIR}/${NAMES[$INDEX]}/${PKGS[$INDEX]%\.tar\.*}/configure.py" --bootstrap >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
         ${SUDO} mv ninja "${PREFIX}/bin" >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
+        echo ""
+    fi
+
+    # openssl
+    INDEX=$((INDEX+1))
+    printf "Building    [%02i/%02i] %s " "$((INDEX+1))" "${TOTAL}" "${NAMES[$INDEX]} ${VERSIONS[$INDEX]}"
+    if [[ "${SKIP[$INDEX]}" == true ]]; then
+        echo "(${INSTALLED_VERSIONS[$INDEX]} installed, skipping)"
+    else
+        [[ "${SUDO}" != "" ]] && ${SUDO} -v
+        touch "${BUILD_DIR}/${NAMES[$INDEX]}.log"
+        mkdir -pv "${BUILD_DIR}/${NAMES[$INDEX]}" > "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
+        cd "${BUILD_DIR}/${NAMES[$INDEX]}"
+        "${SOURCE_DIR}/${NAMES[$INDEX]}/${PKGS[$INDEX]%\.tar\.*}/Configure" --prefix="${PREFIX}" >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
+        make -j "${JOBS}" AR=ar RANLIB=ranlib >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
+        ${SUDO} make install_sw >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
         echo ""
     fi
 
@@ -629,7 +671,7 @@ default install-dir: /usr/local"
         touch "${BUILD_DIR}/${NAMES[$INDEX]}.log"
         mkdir -pv "${BUILD_DIR}/${NAMES[$INDEX]}" > "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
         cd "${BUILD_DIR}/${NAMES[$INDEX]}"
-        "${SOURCE_DIR}/${NAMES[$INDEX]}/${PKGS[$INDEX]%\.tar\.*}/configure" --prefix="${PREFIX}" --with-internal-glib --disable-host-tool >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
+        "${SOURCE_DIR}/${NAMES[$INDEX]}/${PKGS[$INDEX]%\.tar\.*}/configure" --prefix="${PREFIX}" --with-internal-glib --disable-host-tool CFLAGS="-Wno-int-conversion" >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
         make -j "${JOBS}" >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
         ${SUDO} make install >> "${BUILD_DIR}/${NAMES[$INDEX]}.log" 2>&1 || return 1
         echo ""

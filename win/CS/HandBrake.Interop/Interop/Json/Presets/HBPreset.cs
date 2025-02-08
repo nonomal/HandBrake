@@ -77,20 +77,14 @@ namespace HandBrake.Interop.Interop.Json.Presets
         public bool FolderOpen { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether mp 4 http optimize.
+        /// Gets or sets a value indicating whether optimize.
         /// </summary>
-        public bool Mp4HttpOptimize { get; set; }
+        public bool Optimize { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether mp 4 i pod compatible.
         /// </summary>
         public bool Mp4iPodCompatible { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether picture auto crop.
-        /// </summary>
-        [Obsolete("Use PictureCropMode instead. Use only for parsing legacy presets.")]
-        public bool PictureAutoCrop { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether picture loose crop.
@@ -393,14 +387,19 @@ namespace HandBrake.Interop.Interop.Json.Presets
         public double VideoQualitySlider { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether video two pass.
+        /// Gets or sets a value indicating whether video multi pass.
         /// </summary>
-        public bool VideoTwoPass { get; set; }
+        public bool VideoMultiPass { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether video turbo two pass.
+        /// Gets or sets a value indicating whether video turbo multi pass.
         /// </summary>
-        public bool VideoTurboTwoPass { get; set; }
+        public bool VideoTurboMultiPass { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating which dynamic metadata formats to preserve.
+        /// </summary>
+        public string VideoPasshtruHDRDynamicMetadata { get; set; }
 
         /// <summary>
         /// Gets or sets the x 264 option.
@@ -414,6 +413,6 @@ namespace HandBrake.Interop.Interop.Json.Presets
 
         public bool PresetDisabled { get; set; }
 
-        public bool MetadataPassthrough { get; set; }
+        public bool MetadataPassthru { get; set; }
     }
 }

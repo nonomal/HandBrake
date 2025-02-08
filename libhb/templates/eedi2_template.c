@@ -1,6 +1,6 @@
 /* eedi2_template.c
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -74,16 +74,17 @@ void FUNC(eedi2_bit_blit)(pixel *dstp, const int dst_pitch,
  * @param pitch Stride of both bitmaps
  * @param height Height of the original, full-size src plane being copied from
  */
-void FUNC(eedi2_fill_half_height_buffer_plane)(const pixel *src, pixel *dst, const int pitch, const int height)
+void FUNC(eedi2_fill_half_height_buffer_plane)(const pixel *src, pixel *dst, const int src_pitch, const int dst_pitch, const int height)
 {
     /* When TFF, we want to copy alternating
        lines starting at 0, the top field.
        When BFF, we want to start at line 1. */
+    const int pitch = MIN(src_pitch, dst_pitch) * BPS;
     for (int y = height; y > 0; y = y - 2)
     {
-      memcpy(dst, src, pitch * BPS);
-      dst += pitch;
-      src += pitch * 2;
+      memcpy(dst, src, pitch);
+      dst += dst_pitch;
+      src += src_pitch * 2;
     }
 }
 
@@ -1501,8 +1502,8 @@ void FUNC(eedi2_gaussian_blur1)(const pixel * src, const int src_pitch, pixel *t
     srcpp += tmp_pitch;
     srcp += tmp_pitch;
     srcpn += tmp_pitch;
-    src2n += tmp_pitch;
-    src3n += tmp_pitch;
+//    src2n += tmp_pitch;
+//    src3n += tmp_pitch;
     dstp += dst_pitch;
     for( x = 0; x < width; ++x )
     {
@@ -1514,9 +1515,9 @@ void FUNC(eedi2_gaussian_blur1)(const pixel * src, const int src_pitch, pixel *t
     src2p += tmp_pitch;
     srcpp += tmp_pitch;
     srcp += tmp_pitch;
-    srcpn += tmp_pitch;
-    src2n += tmp_pitch;
-    src3n += tmp_pitch;
+//    srcpn += tmp_pitch;
+//    src2n += tmp_pitch;
+//    src3n += tmp_pitch;
     dstp += dst_pitch;
     for( x = 0; x < width; ++x )
     {
@@ -1702,8 +1703,8 @@ void FUNC(eedi2_gaussian_blur_sqrt2)(const int *src, int *tmp, int *dst, const i
     srcp += pitch;
     srcpn += pitch;
     src2n += pitch;
-    src3n += pitch;
-    src4n += pitch;
+//    src3n += pitch;
+//    src4n += pitch;
     dstp += pitch;
     for( x = 0; x < width; ++x )
     {
@@ -1718,9 +1719,9 @@ void FUNC(eedi2_gaussian_blur_sqrt2)(const int *src, int *tmp, int *dst, const i
     srcpp += pitch;
     srcp += pitch;
     srcpn += pitch;
-    src2n += pitch;
-    src3n += pitch;
-    src4n += pitch;
+//    src2n += pitch;
+//    src3n += pitch;
+//    src4n += pitch;
     dstp += pitch;
     for( x = 0; x < width; ++x )
     {
@@ -1733,10 +1734,10 @@ void FUNC(eedi2_gaussian_blur_sqrt2)(const int *src, int *tmp, int *dst, const i
     src2p += pitch;
     srcpp += pitch;
     srcp += pitch;
-    srcpn += pitch;
-    src2n += pitch;
-    src3n += pitch;
-    src4n += pitch;
+//    srcpn += pitch;
+//    src2n += pitch;
+//    src3n += pitch;
+//    src4n += pitch;
     dstp += pitch;
     for( x = 0; x < width; ++x )
     {
