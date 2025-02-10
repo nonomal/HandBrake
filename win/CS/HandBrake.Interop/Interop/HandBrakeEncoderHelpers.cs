@@ -55,6 +55,8 @@ namespace HandBrake.Interop.Interop
             }
         }
 
+        public static HBAudioEncoder NoneAudioEncoder => AudioEncoders.FirstOrDefault(s => s.CodecName == "None");
+
         /// <summary>
         /// Gets a list of supported video encoders.
         /// </summary>
@@ -218,6 +220,13 @@ namespace HandBrake.Interop.Interop
            return GetAudioEncoder(encoder);
         }
 
+        public static HBAudioEncoder GetPassthruFallback(int passthru)
+        {
+            int encoder = HBFunctions.hb_audio_encoder_get_fallback_for_passthru(passthru);
+
+            return GetAudioEncoder(encoder);
+        }
+
         /// <summary>
         /// Gets the video encoder with the specified short name.
         /// </summary>
@@ -280,30 +289,54 @@ namespace HandBrake.Interop.Interop
             return Containers.SingleOrDefault(c => c.ShortName == shortName);
         }
 
-        public static bool VideoEncoderSupportsTwoPass(string encoderShortName)
+        public static bool VideoEncoderSupportsMultiPass(string encoderShortName, bool constantQuality)
         {
             HBVideoEncoder encoder = GetVideoEncoder(encoderShortName);
 
             if (encoder != null)
             {
-                return VideoEncoderSupportsTwoPass(encoder.Id);
+                return VideoEncoderSupportsMultiPass(encoder.Id, constantQuality);
             }
 
             return false;
         }
 
         /// <summary>
-        /// Returns true if the given video encoder supports two-pass mode.
+        /// Returns true if the given video encoder supports multi-pass mode.
         /// </summary>
         /// <param name="encoderId">
         /// The encoder ID.
         /// </param>
         /// <returns>
-        /// True if the given video encoder supports two-pass mode.
+        /// True if the given video encoder supports multi-pass mode.
         /// </returns>
-        public static bool VideoEncoderSupportsTwoPass(int encoderId)
+        public static bool VideoEncoderSupportsMultiPass(int encoderId, bool constantQuality)
         {
-            return HBFunctions.hb_video_twopass_is_supported((uint)encoderId) > 0;
+            return HBFunctions.hb_video_multipass_is_supported((uint)encoderId, Convert.ToInt32(constantQuality)) > 0;
+        }
+
+        public static bool VideoEncoderSupportsQualityMode(string encoderShortName)
+        {
+            HBVideoEncoder encoder = GetVideoEncoder(encoderShortName);
+
+            if (encoder != null)
+            {
+                return HBFunctions.hb_video_quality_is_supported(encoder.Id) > 0;
+            }
+
+            return false;
+        }
+
+        public static bool VideoEncoderSupportsBitrateMode(string encoderShortName)
+        {
+            HBVideoEncoder encoder = GetVideoEncoder(encoderShortName);
+
+            if (encoder != null)
+            {
+                return HBFunctions.hb_video_bitrate_is_supported(encoder.Id) > 0;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -346,7 +379,7 @@ namespace HandBrake.Interop.Interop
         /// <returns>
         /// True if the subtitle type can be passed through with the given muxer.
         /// </returns>
-        public static bool SubtitleCanPassthrough(int subtitleSourceType, int muxer)
+        public static bool SubtitleCanPassthru(int subtitleSourceType, int muxer)
         {
             return HBFunctions.hb_subtitle_can_pass(subtitleSourceType, muxer) > 0;
         }
@@ -399,7 +432,7 @@ namespace HandBrake.Interop.Interop
         /// True if the given encoder is compatible with the given audio track.
         /// </returns>
         /// <remarks>
-        /// Only works with passthrough encoders.
+        /// Only works with passthru encoders.
         /// </remarks>
         public static bool AudioEncoderIsCompatible(int codecId, HBAudioEncoder encoder)
         {
@@ -459,24 +492,21 @@ namespace HandBrake.Interop.Interop
         /// <summary>
         /// Determines if DRC can be applied to the given track with the given encoder.
         /// </summary>
-        /// <param name="handle">
-        /// The handle.
+        /// <param name="codecId">
+        /// The source audio codec.
         /// </param>
-        /// <param name="trackNumber">
-        /// The track Number.
+        /// <param name="codecParam">
+        /// The source audio codec parameters.
         /// </param>
         /// <param name="encoder">
-        /// The encoder to use for DRC.
-        /// </param>
-        /// <param name="title">
-        /// The title.
+        /// The encoder that will be used.
         /// </param>
         /// <returns>
         /// True if DRC can be applied to the track with the given encoder.
         /// </returns>
-        public static bool CanApplyDrc(IntPtr handle, int trackNumber, HBAudioEncoder encoder, int title)
+        public static bool CanApplyDrc(int codecId, int codecParam, HBAudioEncoder encoder)
         {
-            return HBFunctions.hb_audio_can_apply_drc2(handle, title, trackNumber, encoder.Id) > 0; 
+            return HBFunctions.hb_audio_can_apply_drc((uint)codecId, (uint)codecParam, encoder.Id) > 0;
         }
 
         /// <summary>
@@ -488,7 +518,7 @@ namespace HandBrake.Interop.Interop
         /// <returns>
         /// True if the codec can be passed through.
         /// </returns>
-        public static bool CanPassthroughAudio(int codecId)
+        public static bool CanPassthruAudio(int codecId)
         {
             return (codecId & NativeConstants.HB_ACODEC_PASS_MASK) > 0;
         }

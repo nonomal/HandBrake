@@ -83,7 +83,7 @@ static void hqdn3d_precalc_coef(int16_t *ct, int depth, double dist25)
 
     for (i = -(256<<LUT_BITS); i < 256<<LUT_BITS; i++)
     {
-        double f = ((i<<(9-LUT_BITS)) + (1<<(8-LUT_BITS)) - 1) / 512.0; // midpoint of the bin
+        double f = (i * (1 << (9-LUT_BITS)) + (1<<(8-LUT_BITS)) - 1) / 512.0; // midpoint of the bin
         simil = FFMAX(0, 1.0 - fabs(f) / 255.0);
         C = pow(simil, gamma) * 256.0 * f;
         ct[(256<<LUT_BITS)+i] = lrint(C);
@@ -174,7 +174,7 @@ static void hqdn3d_denoise_depth(uint8_t *frame_src, uint8_t *frame_dst,
     if (!frame_ant)
     {
         uint8_t *src = frame_src;
-        (*frame_ant_ptr) = frame_ant = malloc(w*h*sizeof(uint16_t));
+        (*frame_ant_ptr) = frame_ant = calloc(w * h, sizeof(uint16_t));
         for (y = 0; y < h; y++, frame_src += sstride, frame_ant += w)
         {
             for (x = 0; x < w; x++)
@@ -214,6 +214,11 @@ static int hb_denoise_init( hb_filter_object_t * filter,
                             hb_filter_init_t * init )
 {
     filter->private_data = calloc( sizeof(struct hb_filter_private_s), 1 );
+    if (filter->private_data == NULL)
+    {
+        hb_error("denoise: calloc failed");
+        return -1;
+    }
     hb_filter_private_t * pv = filter->private_data;
 
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(init->pix_fmt);
@@ -358,7 +363,7 @@ static int hb_denoise_work(hb_filter_object_t *filter,
                        pv->hqdn3d_coef[coef_index+1]);
     }
 
-    out->s = in->s;
+    hb_buffer_copy_props(out, in);
     *buf_out = out;
 
     return HB_FILTER_OK;

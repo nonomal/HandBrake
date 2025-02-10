@@ -1,6 +1,6 @@
 /* param.h
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -19,8 +19,6 @@ struct hb_filter_param_s
     const char *short_name;
     const char *settings;
 };
-
-void hb_param_configure_qsv(void);
 
 hb_dict_t * hb_generate_filter_settings(int filter_id, const char *preset,
                                         const char *tune, const char *custom);

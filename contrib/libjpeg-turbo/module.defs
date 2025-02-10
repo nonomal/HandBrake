@@ -1,9 +1,9 @@
 $(eval $(call import.MODULE.defs,LIBJPEGTURBO,libjpeg-turbo))
 $(eval $(call import.CONTRIB.defs,LIBJPEGTURBO))
 
-LIBJPEGTURBO.FETCH.url     = https://github.com/HandBrake/HandBrake-contribs/releases/download/contribs/libjpeg-turbo-2.1.3.tar.gz
-LIBJPEGTURBO.FETCH.url    += https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/2.1.3.tar.gz
-LIBJPEGTURBO.FETCH.sha256  = dbda0c685942aa3ea908496592491e5ec8160d2cf1ec9d5fd5470e50768e7859
+LIBJPEGTURBO.FETCH.url     = https://github.com/HandBrake/HandBrake-contribs/releases/download/contribs2/libjpeg-turbo-3.1.0.tar.gz
+LIBJPEGTURBO.FETCH.url    += https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.1.0.tar.gz
+LIBJPEGTURBO.FETCH.sha256  = 35fec2e1ddfb05ecf6d93e50bc57c1e54bc81c16d611ddf6eff73fff266d8285
 
 LIBJPEGTURBO.build_dir             = build
 LIBJPEGTURBO.CONFIGURE.exe         = cmake
@@ -11,6 +11,7 @@ LIBJPEGTURBO.CONFIGURE.args.prefix = -DCMAKE_INSTALL_PREFIX="$(LIBJPEGTURBO.CONF
 LIBJPEGTURBO.CONFIGURE.deps        =
 LIBJPEGTURBO.CONFIGURE.static      =
 LIBJPEGTURBO.CONFIGURE.shared      = -DENABLE_SHARED=OFF
+LIBJPEGTURBO.CONFIGURE.extra       = -DCMAKE_INSTALL_LIBDIR=lib
 
 ifeq (size-aggressive,$(GCC.O))
     LIBJPEGTURBO.CONFIGURE.extra += -DCMAKE_CXX_FLAGS_MINSIZEREL="-Oz -DNDEBUG" -DCMAKE_C_FLAGS_MINSIZEREL="-Oz -DNDEBUG"
@@ -37,10 +38,7 @@ ifeq (1,$(HOST.cross))
         LIBJPEGTURBO.CONFIGURE.extra += -DCMAKE_SYSTEM_NAME=Windows
         LIBJPEGTURBO.CONFIGURE.extra += -DCMAKE_SYSTEM_PROCESSOR=$(HOST.machine)
         LIBJPEGTURBO.CONFIGURE.extra += -DCMAKE_C_COMPILER=$(LIBJPEGTURBO.GCC.gcc)
-        LIBJPEGTURBO.CONFIGURE.extra += -DCMAKE_C_FLAGS="-static-libgcc -static-libstdc++ -static"
-        LIBJPEGTURBO.CONFIGURE.extra += -DCMAKE_SHARED_LIBRARY_LINK_C_FLAGS="-static-libgcc -static-libstdc++ -static"
         LIBJPEGTURBO.CONFIGURE.extra += -DCMAKE_CXX_COMPILER=$(LIBJPEGTURBO.GCC.gxx)
-        LIBJPEGTURBO.CONFIGURE.extra += -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++ -static"
         LIBJPEGTURBO.CONFIGURE.extra += -DCMAKE_RC_COMPILER=$(HOST.cross.prefix)windres
         LIBJPEGTURBO.CONFIGURE.args.host  = -DCMAKE_HOST_SYSTEM="$(LIBJPEGTURBO.CONFIGURE.host)"
     else ifeq ($(HOST.system),darwin)

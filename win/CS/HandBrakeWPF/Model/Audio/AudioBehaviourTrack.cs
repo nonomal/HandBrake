@@ -279,7 +279,7 @@ namespace HandBrakeWPF.Model.Audio
         {
             get
             {
-                if (this.Encoder != null && this.Encoder.IsPassthrough)
+                if (this.Encoder != null && this.Encoder.IsPassthru)
                 {
                     return "Auto";
                 }
@@ -338,10 +338,12 @@ namespace HandBrakeWPF.Model.Audio
         {
             get
             {
-                return this.Encoder != null && this.Encoder.IsPassthrough;
+                return this.Encoder != null && this.Encoder.IsPassthru;
             }
         }
 
+        public bool IsAutoPassthru => this.Encoder != null && this.Encoder.IsAutoPassthru;
+        
         /// <summary>
         /// Gets the bitrates.
         /// </summary>
@@ -647,7 +649,7 @@ namespace HandBrakeWPF.Model.Audio
         private HBAudioEncoder GetEncoderForLimits()
         {
             HBAudioEncoder hbaenc = this.Encoder;
-            if (hbaenc != null && hbaenc.IsPassthrough)
+            if (hbaenc != null && hbaenc.IsPassthru)
             {
                 hbaenc = this.fallbackEncoder;
             }

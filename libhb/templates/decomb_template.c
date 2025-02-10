@@ -1,6 +1,6 @@
 /* decomb_template.c
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -15,6 +15,9 @@
 #   define FUNC(name) name##_##8
 #endif
 
+#if defined (__aarch64__) && !defined(__APPLE__)
+    #include <arm_neon.h>
+#endif
 #include "handbrake/eedi2.h"
 
 static void FUNC(init_crop_table)(void **crop_table_out, const int max_value)
@@ -103,6 +106,176 @@ static inline void FUNC(cubic_interpolate_line)(pixel *dst,
     }
 }
 
+#if defined (__aarch64__) && !defined(__APPLE__)
+#if BIT_DEPTH > 8
+static void FUNC(blend_filter_line)(const filter_param_t *filter,
+                                    const pixel *crop_table,
+                                    pixel *dst,
+                                    const pixel *cur,
+                                    const int width,
+                                    const int height,
+                                    const int stride,
+                                    const int y)
+{
+    int up1, up2, down1, down2;
+    if (y > 1 && y < (height - 2))
+    {
+        up1 = -1 * stride;
+        up2 = -2 * stride;
+        down1 = 1 * stride;
+        down2 = 2 * stride;
+    }
+    else if (y == 0)
+    {
+        up1 = up2 = 0;
+        down1 = 1 * stride;
+        down2 = 2 * stride;
+    }
+    else if (y == 1)
+    {
+        up1 = up2 = -1 * stride;
+        down1 = 1 * stride;
+        down2 = 2 * stride;
+    }
+    else if (y == (height - 2))
+    {
+        up1 = -1 * stride;
+        up2 = -2 * stride;
+        down1 = down2 = 1 * stride;
+    }
+    else if (y == (height - 1))
+    {
+        up1 = -1 * stride;
+        up2 = -2 * stride;
+        down1 = down2 = 0;
+    }
+    else
+    {
+        hb_error("Invalid value y %d height %d", y, height);
+        return;
+    }
+
+    int32x4_t tap0 = vdupq_n_s32(filter->tap[0]);
+    int32x4_t tap1 = vdupq_n_s32(filter->tap[1]);
+    int32x4_t tap2 = vdupq_n_s32(filter->tap[2]);
+    int32x4_t tap3 = vdupq_n_s32(filter->tap[3]);
+    int32x4_t tap4 = vdupq_n_s32(filter->tap[4]);
+
+    int32x4_t filter_norm_vec = vdupq_n_s32(-filter->normalize);
+    int32x4_t offset = vdupq_n_s32(1024);
+    for (int x = 0; x < width; x += 4)
+    {
+        uint32_t cr_table_vec[4];
+        int32x4_t up2_pixels = vreinterpretq_s32_u32(vmovl_u16(vld1_u16(cur + x + up2)));
+        int32x4_t up1_pixels = vreinterpretq_s32_u32(vmovl_u16(vld1_u16(cur + x + up1)));
+        int32x4_t current_pixels = vreinterpretq_s32_u32(vmovl_u16(vld1_u16(cur + x )));
+        int32x4_t down1_pixels = vreinterpretq_s32_u32(vmovl_u16(vld1_u16(cur + x + down1)));
+        int32x4_t down2_pixels = vreinterpretq_s32_u32(vmovl_u16(vld1_u16(cur + x + down2)));
+
+        int32x4_t result = vmulq_s32(up2_pixels, tap0);
+        result = vmlaq_s32(result, up1_pixels, tap1);
+        result = vmlaq_s32(result, current_pixels, tap2);
+        result = vmlaq_s32(result, down1_pixels, tap3);
+        result = vmlaq_s32(result, down2_pixels, tap4);
+
+        result = vshrq_n_s32(result, 3);
+
+        uint32x4_t result_u32 = vreinterpretq_u32_s32(vaddq_s32(result, offset));
+        vst1q_u32(cr_table_vec, result_u32);
+        dst[x+0] = crop_table[cr_table_vec[0]];
+        dst[x+1] = crop_table[cr_table_vec[1]];
+        dst[x+2] = crop_table[cr_table_vec[2]];
+        dst[x+3] = crop_table[cr_table_vec[3]];
+    }
+}
+#else
+
+static void FUNC(blend_filter_line)(const filter_param_t *filter,
+                                    const pixel *crop_table,
+                                    pixel *dst,
+                                    const pixel *cur,
+                                    const int width,
+                                    const int height,
+                                    const int stride,
+                                    const int y)
+{
+    int up1, up2, down1, down2;
+    if (y > 1 && y < (height - 2))
+    {
+        up1 = -1 * stride;
+        up2 = -2 * stride;
+        down1 = 1 * stride;
+        down2 = 2 * stride;
+    }
+    else if (y == 0)
+    {
+        up1 = up2 = 0;
+        down1 = 1 * stride;
+        down2 = 2 * stride;
+    }
+    else if (y == 1)
+    {
+        up1 = up2 = -1 * stride;
+        down1 = 1 * stride;
+        down2 = 2 * stride;
+    }
+    else if (y == (height - 2))
+    {
+        up1 = -1 * stride;
+        up2 = -2 * stride;
+        down1 = down2 = 1 * stride;
+    }
+    else if (y == (height - 1))
+    {
+        up1 = -1 * stride;
+        up2 = -2 * stride;
+        down1 = down2 = 0;
+    }
+    else
+    {
+        hb_error("Invalid value y %d height %d", y, height);
+        return;
+    }
+
+    int16x8_t tap0 = vdupq_n_s16(filter->tap[0]);
+    int16x8_t tap1 = vdupq_n_s16(filter->tap[1]);
+    int16x8_t tap2 = vdupq_n_s16(filter->tap[2]);
+    int16x8_t tap3 = vdupq_n_s16(filter->tap[3]);
+    int16x8_t tap4 = vdupq_n_s16(filter->tap[4]);
+
+    int16x8_t filter_norm_vec = vdupq_n_s16(-filter->normalize);
+    int16x8_t offset = vdupq_n_s16(1024);
+    for (int x = 0; x < width; x += 8)
+    {
+        uint16_t cr_table_vec[8];
+        int16x8_t up2_pixels = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(cur + x + up2)));
+        int16x8_t up1_pixels = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(cur + x + up1)));
+        int16x8_t current_pixels = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(cur + x )));
+        int16x8_t down1_pixels = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(cur + x + down1)));
+        int16x8_t down2_pixels = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(cur + x + down2)));
+
+        int16x8_t result = vmulq_s16(up2_pixels, tap0);
+        result = vmlaq_s16(result, up1_pixels, tap1);
+        result = vmlaq_s16(result, current_pixels, tap2);
+        result = vmlaq_s16(result, down1_pixels, tap3);
+        result = vmlaq_s16(result, down2_pixels, tap4);
+
+        result = vshrq_n_s16(result, 3);
+
+        uint16x8_t result_u16 = vreinterpretq_u16_s16(vaddq_s16(result, offset));
+        vst1q_u16(cr_table_vec, result_u16);
+        dst[x+0] = crop_table[cr_table_vec[0]];
+        dst[x+1] = crop_table[cr_table_vec[1]];
+        dst[x+2] = crop_table[cr_table_vec[2]];
+        dst[x+3] = crop_table[cr_table_vec[3]];
+        dst[x+4] = crop_table[cr_table_vec[4]];
+        dst[x+5] = crop_table[cr_table_vec[5]];
+        dst[x+6] = crop_table[cr_table_vec[6]];
+        dst[x+7] = crop_table[cr_table_vec[7]];
+    }
+}
+#endif
+#else
 static inline int FUNC(blend_filter_pixel)(const filter_param_t *filter,
                                            const pixel *crop_table,
                                            const int up2, const int up1,
@@ -186,6 +359,7 @@ static void FUNC(blend_filter_line)(const filter_param_t *filter,
         cur++;
     }
 }
+#endif
 
 /// This function calls all the eedi2 filters in sequence for a given plane.
 /// It outputs the final interpolated image to pv->eedi_full[DST2PF].
@@ -283,12 +457,14 @@ static void FUNC(eedi2_planer)(hb_filter_private_t *pv)
     // Copy the first field from the source to a half-height frame.
     for (int pp = 0;  pp < 3; pp++)
     {
-        const int pitch = pv->ref[1]->plane[pp].stride / pv->bps;
+        const int src_pitch = pv->ref[1]->plane[pp].stride / pv->bps;
+        const int dst_pitch = pv->eedi_half[SRCPF]->plane[pp].stride / pv->bps;
         const int height = pv->ref[1]->plane[pp].height;
         const int start_line = !pv->tff;
 
-        FUNC(eedi2_fill_half_height_buffer_plane)(&((pixel *)pv->ref[1]->plane[pp].data)[pitch * start_line],
-                                                  (pixel *)pv->eedi_half[SRCPF]->plane[pp].data, pitch, height);
+        FUNC(eedi2_fill_half_height_buffer_plane)(&((pixel *)pv->ref[1]->plane[pp].data)[src_pitch * start_line],
+                                                  (pixel *)pv->eedi_half[SRCPF]->plane[pp].data,
+                                                  src_pitch, dst_pitch, height);
     }
 
     // Now that all data is ready for our threads, fire them off
@@ -300,82 +476,118 @@ static void FUNC(eedi2_planer)(hb_filter_private_t *pv)
 /// Checks 4 different slopes to see if there is more similarity along a diagonal
 /// than there was vertically. If a diagonal is more similar, then it indicates
 /// an edge, so interpolate along that instead of a vertical line, using either
-///l inear or cubic interpolation depending on mode.
+/// linear or cubic interpolation depending on mode.
 #if BIT_DEPTH > 8
 
-#define YADIF_CHECK(j) {\
-        int score = ABS(cur[-stride-1+j] - cur[+stride-1-j])\
-                      + ABS(cur[-stride  +j] - cur[+stride  -j])\
-                      + ABS(cur[-stride+1+j] - cur[+stride+1-j]);\
-        if (score < spatial_score)\
-        {\
-            spatial_score = score;\
-            if ((pv->mode & MODE_DECOMB_CUBIC) && !vertical_edge)\
-            {\
-                switch(j)\
-                {\
-                    case -1:\
-                        spatial_pred = cubic_interpolate_pixel_16(crop_table, cur[-3 * stride - 3], cur[-stride -1], cur[+stride + 1], cur[3* stride + 3] );\
-                    break;\
-                    case -2:\
-                        spatial_pred = cubic_interpolate_pixel_16(crop_table, ( ( cur[-3*stride - 4] + cur[-stride - 4] ) / 2 ) , cur[-stride -2], cur[+stride + 2], ( ( cur[3*stride + 4] + cur[stride + 4] ) / 2 ) );\
-                    break;\
-                    case 1:\
-                        spatial_pred = cubic_interpolate_pixel_16(crop_table, cur[-3 * stride +3], cur[-stride +1], cur[+stride - 1], cur[3* stride -3] );\
-                    break;\
-                    case 2:\
-                        spatial_pred = cubic_interpolate_pixel_16(crop_table, ( ( cur[-3*stride + 4] + cur[-stride + 4] ) / 2 ), cur[-stride +2], cur[+stride - 2], ( ( cur[3*stride - 4] + cur[stride - 4]) / 2));\
-                    break;\
-                }\
-            }\
-            else\
-            {\
-                spatial_pred = (cur[-stride +j] + cur[+stride -j]) >> 1;\
-            }\
+#define YADIF_CHECK(j)                                                                                                  \
+{                                                                                                                       \
+    int score = ABS(cur[stride_cur_p - 1 + j] - cur[stride_cur_n - 1 -  j]) +                                           \
+                ABS(cur[stride_cur_p     + j] - cur[stride_cur_n      - j]) +                                           \
+                ABS(cur[stride_cur_p + 1 + j] - cur[stride_cur_n + 1 -  j]);                                            \
+    if (score < spatial_score)                                                                                          \
+    {                                                                                                                   \
+        spatial_score = score;                                                                                          \
+        if ((pv->mode & MODE_DECOMB_CUBIC) && !vertical_edge)                                                           \
+        {                                                                                                               \
+            switch (j)                                                                                                  \
+            {                                                                                                           \
+                case -1:                                                                                                \
+                    spatial_pred = cubic_interpolate_pixel_16(crop_table,                                               \
+                                                              cur[-3 * stride_cur - 3],                                 \
+                                                              cur[-stride_cur - 1],                                     \
+                                                              cur[+stride_cur + 1],                                     \
+                                                              cur[3 * stride_cur + 3]);                                 \
+                break;                                                                                                  \
+                case -2:                                                                                                \
+                    spatial_pred = cubic_interpolate_pixel_16(crop_table,                                               \
+                                                              ((cur[-3 * stride_cur - 4] + cur[-stride_cur - 4]) / 2),  \
+                                                                cur[-stride_cur - 2],                                   \
+                                                                cur[+stride_cur + 2],                                   \
+                                                              ((cur[3 * stride_cur + 4]  + cur[stride_cur + 4]) / 2));  \
+                break;                                                                                                  \
+                case 1:                                                                                                 \
+                    spatial_pred = cubic_interpolate_pixel_16(crop_table,                                               \
+                                                              cur[-3 * stride_cur +3],                                  \
+                                                              cur[-stride_cur + 1],                                     \
+                                                              cur[+stride_cur - 1],                                     \
+                                                              cur[3 * stride_cur - 3] );                                \
+                break;                                                                                                  \
+                case 2:                                                                                                 \
+                    spatial_pred = cubic_interpolate_pixel_16(crop_table,                                               \
+                                                             ((cur[-3 * stride_cur + 4] + cur[-stride_cur + 4]) / 2),   \
+                                                               cur[-stride_cur + 2],                                    \
+                                                               cur[+stride_cur - 2],                                    \
+                                                             ((cur[3 * stride_cur - 4]  + cur[stride_cur - 4]) / 2));   \
+                break;                                                                                                  \
+            }                                                                                                           \
+        }                                                                                                               \
+        else                                                                                                            \
+        {                                                                                                               \
+            spatial_pred = (cur[stride_cur_p + j] + cur[stride_cur_n - j]) >> 1;                                        \
+        }
 
 #else
 
-#define YADIF_CHECK(j) {\
-        int score = ABS(cur[-stride-1+j] - cur[+stride-1-j])\
-                      + ABS(cur[-stride  +j] - cur[+stride  -j])\
-                      + ABS(cur[-stride+1+j] - cur[+stride+1-j]);\
-        if (score < spatial_score)\
-        {\
-            spatial_score = score;\
-            if ((pv->mode & MODE_DECOMB_CUBIC ) && !vertical_edge)\
-            {\
-                switch(j)\
-                {\
-                    case -1:\
-                        spatial_pred = cubic_interpolate_pixel_8(crop_table, cur[-3 * stride - 3], cur[-stride -1], cur[+stride + 1], cur[3* stride + 3] );\
-                    break;\
-                    case -2:\
-                        spatial_pred = cubic_interpolate_pixel_8(crop_table, ( ( cur[-3*stride - 4] + cur[-stride - 4] ) / 2 ) , cur[-stride -2], cur[+stride + 2], ( ( cur[3*stride + 4] + cur[stride + 4] ) / 2 ) );\
-                    break;\
-                    case 1:\
-                        spatial_pred = cubic_interpolate_pixel_8(crop_table, cur[-3 * stride +3], cur[-stride +1], cur[+stride - 1], cur[3* stride -3] );\
-                    break;\
-                    case 2:\
-                        spatial_pred = cubic_interpolate_pixel_8(crop_table, ( ( cur[-3*stride + 4] + cur[-stride + 4] ) / 2 ), cur[-stride +2], cur[+stride - 2], ( ( cur[3*stride - 4] + cur[stride - 4] ) / 2 ) );\
-                    break;\
-                }\
-            }\
-            else\
-            {\
-                spatial_pred = (cur[-stride +j] + cur[+stride -j]) >> 1;\
-            }\
-
+#define YADIF_CHECK(j)                                                                                                  \
+{                                                                                                                       \
+    int score = ABS(cur[stride_cur_p - 1 + j] - cur[stride_cur_n - 1 -  j]) +                                           \
+                ABS(cur[stride_cur_p     + j] - cur[stride_cur_n      - j]) +                                           \
+                ABS(cur[stride_cur_p + 1 + j] - cur[stride_cur_n + 1 -  j]);                                            \
+    if (score < spatial_score)                                                                                          \
+    {                                                                                                                   \
+        spatial_score = score;                                                                                          \
+        if ((pv->mode & MODE_DECOMB_CUBIC) && !vertical_edge)                                                           \
+        {                                                                                                               \
+            switch (j)                                                                                                  \
+            {                                                                                                           \
+                case -1:                                                                                                \
+                    spatial_pred = cubic_interpolate_pixel_8(crop_table,                                                \
+                                                             cur[-3 * stride_cur - 3],                                  \
+                                                             cur[-stride_cur - 1],                                      \
+                                                             cur[+stride_cur + 1],                                      \
+                                                             cur[3 * stride_cur + 3]);                                  \
+                break;                                                                                                  \
+                case -2:                                                                                                \
+                    spatial_pred = cubic_interpolate_pixel_8(crop_table,                                                \
+                                                            ((cur[-3 * stride_cur - 4] + cur[-stride_cur - 4]) / 2),    \
+                                                              cur[-stride_cur - 2],                                     \
+                                                              cur[+stride_cur + 2],                                     \
+                                                            ((cur[3 * stride_cur + 4]  + cur[stride_cur + 4]) / 2));    \
+                break;                                                                                                  \
+                case 1:                                                                                                 \
+                    spatial_pred = cubic_interpolate_pixel_8(crop_table,                                                \
+                                                             cur[-3 * stride_cur +3],                                   \
+                                                             cur[-stride_cur + 1],                                      \
+                                                             cur[+stride_cur - 1],                                      \
+                                                             cur[3 * stride_cur - 3] );                                 \
+                break;                                                                                                  \
+                case 2:                                                                                                 \
+                    spatial_pred = cubic_interpolate_pixel_8(crop_table,                                                \
+                                                            ((cur[-3 * stride_cur + 4] + cur[-stride_cur + 4]) / 2),    \
+                                                              cur[-stride_cur + 2],                                     \
+                                                              cur[+stride_cur - 2],                                     \
+                                                            ((cur[3 * stride_cur - 4]  + cur[stride_cur - 4]) / 2));    \
+                break;                                                                                                  \
+            }                                                                                                           \
+        }                                                                                                               \
+        else                                                                                                            \
+        {                                                                                                               \
+            spatial_pred = (cur[stride_cur_p + j] + cur[stride_cur_n - j]) >> 1;                                        \
+        }
 #endif
 
-static void FUNC(yadif_filter_line)(hb_filter_private_t *pv,
+static void FUNC(yadif_filter_line)(const hb_filter_private_t *pv,
                                     pixel             *dst,
                                     const pixel       *prev,
                                     const pixel       *cur,
                                     const pixel       *next,
+                                    const int          stride_dst,
+                                    const int          stride_prev,
+                                    const int          stride_cur,
+                                    const int          stride_next,
                                     const int          plane,
                                     const int          width,
                                     const int          height,
-                                    const int          stride,
                                     const int          parity,
                                     const int          y)
 {
@@ -385,41 +597,49 @@ static void FUNC(yadif_filter_line)(hb_filter_private_t *pv,
     // They are the previous and next fields, the fields temporally adjacent
     // to the other field in the current frame--the one not being filtered.
     const pixel *prev2 = parity ? prev : cur;
+    const int stride_prev2 = parity ? stride_prev : stride_cur;
+
     const pixel *next2 = parity ? cur  : next;
+    const int stride_next2 = parity ? stride_cur : stride_next;
+
+    // Invert the stride for the first and last line
+    const int stride_prev_p = y ? -stride_prev : stride_prev;
+    const int stride_prev_n = y + 1 < height ? stride_prev : -stride_prev;
+    const int stride_cur_p  = y ? -stride_cur : stride_cur;
+    const int stride_cur_n  = y + 1 < height ? stride_cur : -stride_cur;
+    const int stride_next_p = y ? -stride_next : stride_next;
+    const int stride_next_n = y + 1 < height ? stride_next : -stride_next;
 
     const int eedi2_mode = (pv->mode & MODE_DECOMB_EEDI2);
 
     // We can replace spatial_pred with this interpolation
-    const pixel *eedi2_guess = NULL;
-    if (eedi2_mode)
-    {
-        eedi2_guess = &((pixel *)pv->eedi_full[DST2PF]->plane[plane].data)[y * stride];
-    }
+    const pixel *eedi2_guess = eedi2_mode ? &((pixel *)pv->eedi_full[DST2PF]->plane[plane].data)[y * stride_dst] : NULL;
 
     // Decomb's cubic interpolation can only function when there are
     // three samples above and below, so regress to yadif's traditional
     // two-tap interpolation when filtering at the top and bottom edges.
-    int vertical_edge = 0;
-    if ((y < 3) || (y > (height - 4)))
-    {
-        vertical_edge = 1;
-    }
+    const int vertical_edge = (y < 3) || (y > (height - 4)) ? 1 : 0;
+
+    // YADIF_CHECK requires a margin to avoid invalid memory access.
+    // In MODE_DECOMB_CUBIC, margin needed is 2 + ABS(param).
+    // Else, the margin needed is 1 + ABS(param).
+    const int margin = pv->mode & MODE_DECOMB_CUBIC ? 3 : 2;
 
     for (int x = 0; x < width; x++)
     {
         // Pixel above
-        const int c              = cur[-stride];
+        const int c = cur[stride_cur_p];
         // Temporal average: the current location in the adjacent fields
-        const int d              = (prev2[0] + next2[0]) >> 1;
+        const int d = (prev2[0] + next2[0]) >> 1;
         // Pixel below
-        const int e              = cur[+stride];
+        const int e = cur[stride_cur_n];
 
         // How the current pixel changes between the adjacent fields
         const int temporal_diff0 = ABS(prev2[0] - next2[0]);
         // The average of how much the pixels above and below change from the frame before to now.
-        const int temporal_diff1 = (ABS(prev[-stride] - cur[-stride]) + ABS(prev[+stride] - cur[+stride])) >> 1;
+        const int temporal_diff1 = (ABS(prev[stride_prev_p] - c) + ABS(prev[stride_prev_n] - e)) >> 1;
         // The average of how much the pixels above and below change from now to the next frame.
-        const int temporal_diff2 = (ABS(next[-stride] - cur[-stride]) + ABS(next[+stride] - cur[+stride])) >> 1;
+        const int temporal_diff2 = (ABS(next[stride_next_p] - c) + ABS(next[stride_next_n] - e)) >> 1;
         // For the actual difference, use the largest of the previous average diffs.
         int diff                 = MAX3(temporal_diff0 >> 1, temporal_diff1, temporal_diff2);
 
@@ -433,54 +653,41 @@ static void FUNC(yadif_filter_line)(hb_filter_private_t *pv,
         }
         else // Yadif spatial interpolation
         {
-            // SAD of how the pixel-1, the pixel, and the pixel+1 change from the line above to below.
-            int spatial_score  = ABS(cur[-stride-1] - cur[+stride-1]) + ABS(cur[-stride]-cur[+stride]) +
-                                         ABS(cur[-stride+1] - cur[+stride+1]) - 1;
-
             // Spatial pred is either a bilinear or cubic vertical interpolation.
             if ((pv->mode & MODE_DECOMB_CUBIC) && !vertical_edge)
             {
                 spatial_pred = FUNC(cubic_interpolate_pixel)(crop_table,
-                                                             cur[-3*stride], cur[-stride],
-                                                             cur[+stride], cur[3*stride]);
+                                                             cur[-3 * stride_cur], cur[-stride_cur],
+                                                             cur[+stride_cur],     cur[3 * stride_cur]);
             }
             else
             {
-                spatial_pred = (c+e) >> 1;
+                spatial_pred = (c + e) >> 1;
             }
 
-            // YADIF_CHECK requires a margin to avoid invalid memory access.
-            // In MODE_DECOMB_CUBIC, margin needed is 2 + ABS(param).
-            // Else, the margin needed is 1 + ABS(param).
-            int margin = 2;
-            if (pv->mode & MODE_DECOMB_CUBIC)
+            if (x > margin && x < width - (margin + 1))
             {
-                margin = 3;
-            }
+                // SAD of how the pixel-1, the pixel, and the pixel+1 change from the line above to below.
+                int spatial_score = ABS(cur[stride_cur_p-1] - cur[stride_cur_n-1]) + ABS(c - e) +
+                                    ABS(cur[stride_cur_p+1] - cur[stride_cur_n+1]) - 1;
 
-            if (x >= margin && x <= width - (margin + 1))
-            {
-                YADIF_CHECK(-1)
-                if (x >= margin + 1 && x <= width - (margin + 2))
-                    YADIF_CHECK(-2) }} }}
-            }
-            if (x >= margin && x <= width - (margin + 1))
-            {
-                YADIF_CHECK(1)
-                if (x >= margin + 1 && x <= width - (margin + 2))
-                    YADIF_CHECK(2) }} }}
+                YADIF_CHECK(-1) YADIF_CHECK(-2) }} }}
+                YADIF_CHECK( 1) YADIF_CHECK( 2) }} }}
             }
         }
 
         // Temporally adjust the spatial prediction by
         // comparing against lines in the adjacent fields.
-        const int b = (prev2[-2 * stride] + next2[-2 * stride]) >> 1;
-        const int f = (prev2[+2 * stride] + next2[+2 * stride]) >> 1;
+        if (!vertical_edge)
+        {
+            const int b = (prev2[-2 * stride_prev2] + next2[-2 * stride_next2]) >> 1;
+            const int f = (prev2[+2 * stride_prev2] + next2[+2 * stride_next2]) >> 1;
 
-        // Find the median value
-        const int max = MAX3(d-e, d-c, MIN(b-c, f-e));
-        const int min = MIN3(d-e, d-c, MAX(b-c, f-e));
-        diff = MAX3(diff, min, -max);
+            // Find the median value
+            const int max = MAX3(d-e, d-c, MIN(b-c, f-e));
+            const int min = MIN3(d-e, d-c, MAX(b-c, f-e));
+            diff = MAX3(diff, min, -max);
+        }
 
         if (spatial_pred > d + diff)
         {
@@ -511,15 +718,6 @@ static void FUNC(yadif_decomb_filter_work)(void *thread_args_v)
     const int segment = thread_args->arg.segment;
     yadif_arguments_t *yadif_work = &pv->yadif_arguments[segment];
 
-    filter_param_t filter;
-
-    filter.tap[0] = -1;
-    filter.tap[1] = 2;
-    filter.tap[2] = 6;
-    filter.tap[3] = 2;
-    filter.tap[4] = -1;
-    filter.normalize = 3;
-
     // Process all three planes, but only this segment of it.
     const int mode = pv->yadif_arguments[segment].mode;
     const int tff = yadif_work->tff;
@@ -531,101 +729,88 @@ static void FUNC(yadif_decomb_filter_work)(void *thread_args_v)
     for (int pp = 0; pp < 3; pp++)
     {
         const int width = dst->plane[pp].width;
+        const int height = dst->plane[pp].height;
         const int size = dst->plane[pp].width * pv->bps;
-        const int stride = dst->plane[pp].stride / pv->bps;
-        const int height = dst->plane[pp].height_stride;
-        const int penultimate = height - 2;
+
+        const int stride_dst  = dst->plane[pp].stride / pv->bps;
+        const int stride_prev = pv->ref[0]->plane[pp].stride / pv->bps;
+        const int stride_cur  = pv->ref[1]->plane[pp].stride / pv->bps;
+        const int stride_next = pv->ref[2]->plane[pp].stride / pv->bps;
 
         const int segment_start = thread_args->segment_start[pp];
         const int segment_stop = segment_start + thread_args->segment_height[pp];
 
         // Filter parity lines
         int          start = parity ? (segment_start + 1) & ~1 : segment_start | 1;
-        pixel       *dst2 = &((pixel *)dst->plane[pp].data)[start * stride];
-        const pixel *prev = &((const pixel *)pv->ref[0]->plane[pp].data)[start * stride];
-        const pixel *cur  = &((const pixel *)pv->ref[1]->plane[pp].data)[start * stride];
-        const pixel *next = &((const pixel *)pv->ref[2]->plane[pp].data)[start * stride];
+        pixel       *dst2 = &((pixel *)dst->plane[pp].data)[start * stride_dst];
+        const pixel *prev = &((const pixel *)pv->ref[0]->plane[pp].data)[start * stride_prev];
+        const pixel *cur  = &((const pixel *)pv->ref[1]->plane[pp].data)[start * stride_cur];
+        const pixel *next = &((const pixel *)pv->ref[2]->plane[pp].data)[start * stride_next];
 
         if (mode == MODE_DECOMB_BLEND)
         {
+            filter_param_t filter;
+
+            filter.tap[0] = -1;
+            filter.tap[1] =  2;
+            filter.tap[2] =  6;
+            filter.tap[3] =  2;
+            filter.tap[4] = -1;
+            filter.normalize = 3;
+
             // These will be useful if we ever do temporal blending.
             for (int yy = start; yy < segment_stop; yy += 2)
             {
                 // This line gets blend filtered, not yadif filtered.
-                FUNC(blend_filter_line)(&filter, crop_table, dst2, cur, width, height, stride, yy);
-                dst2 += stride * 2;
-                cur += stride * 2;
+                FUNC(blend_filter_line)(&filter, crop_table, dst2, cur, width, height, stride_cur, yy);
+                dst2 += stride_dst * 2;
+                cur  += stride_cur * 2;
             }
         }
         else if (mode == MODE_DECOMB_CUBIC)
         {
-            for (int yy = start; yy < segment_stop; yy += 2 )
+            for (int yy = start; yy < segment_stop; yy += 2)
             {
                 // Just apply vertical cubic interpolation
-                FUNC(cubic_interpolate_line)(dst2, crop_table, cur, width, height, stride, yy);
-                dst2 += stride * 2;
-                cur += stride * 2;
+                FUNC(cubic_interpolate_line)(dst2, crop_table, cur, width, height, stride_cur, yy);
+                dst2 += stride_dst * 2;
+                cur  += stride_cur * 2;
             }
         }
         else if (mode & MODE_DECOMB_YADIF)
         {
             for (int yy = start; yy < segment_stop; yy += 2)
             {
-                if (yy > 1 && yy < penultimate)
-                {
-                    // This isn't the top or bottom,
-                    // proceed as normal to yadif
-                    FUNC(yadif_filter_line)(pv, dst2, prev, cur, next, pp,
-                                            width, height, stride,
-                                            parity ^ tff, yy);
-                }
-                else
-                {
-                    // parity == 0 (TFF), y1 = y0
-                    // parity == 1 (BFF), y0 = y1
-                    // parity == 0 (TFF), yu = yp
-                    // parity == 1 (BFF), yp = yu
-                    int yp = (yy ^ parity) * stride;
-                    memcpy(dst2, &((const pixel *)pv->ref[1]->plane[pp].data)[yp], size);
-                }
-                dst2 += stride * 2;
-                prev += stride * 2;
-                cur += stride * 2;
-                next += stride * 2;
-            }
-        }
-        else
-        {
-            // No combing, copy frame
-            for (int yy = start; yy < segment_stop; yy += 2 )
-            {
-                memcpy(dst2, cur, size);
-                dst2 += stride * 2;
-                cur += stride * 2;
+
+                FUNC(yadif_filter_line)(pv, dst2, prev, cur, next,
+                                        stride_dst, stride_prev, stride_cur, stride_next,
+                                        pp, width, height,
+                                        parity ^ tff, yy);
+                dst2 += stride_dst  * 2;
+                prev += stride_prev * 2;
+                cur  += stride_cur  * 2;
+                next += stride_next * 2;
             }
         }
 
         // Copy unfiltered lines
         start = !parity ? (segment_start + 1) & ~1 : segment_start | 1;
-        dst2 = &((pixel *)dst->plane[pp].data)[start * stride];
-        prev = &((const pixel *)pv->ref[0]->plane[pp].data)[start * stride];
-        cur  = &((const pixel *)pv->ref[1]->plane[pp].data)[start * stride];
-        next = &((const pixel *)pv->ref[2]->plane[pp].data)[start * stride];
+        dst2 = &((pixel *)dst->plane[pp].data)[start * stride_dst];
+        cur  = &((const pixel *)pv->ref[1]->plane[pp].data)[start * stride_cur];
 
-        for (int yy = start; yy < segment_stop; yy += 2 )
+        for (int yy = start; yy < segment_stop; yy += 2)
         {
             memcpy(dst2, cur, size);
-            dst2 += stride * 2;
-            cur += stride * 2;
+            dst2 += stride_dst * 2;
+            cur  += stride_cur * 2;
         }
     }
-
 }
 
 static void FUNC(filter)(hb_filter_private_t *pv,
                          hb_buffer_t *dst,
-                         int parity,
-                         int tff)
+                         const int parity,
+                         const int tff)
 {
     int is_combed = HB_COMB_HEAVY;
     int mode = 0;

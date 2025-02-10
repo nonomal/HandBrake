@@ -1,6 +1,6 @@
 /* test.c
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -59,6 +59,7 @@
 #define ROTATE_DEFAULT               "angle=180:hflip=0"
 #define DEBLOCK_DEFAULT_PRESET       "medium"
 #define COLORSPACE_DEFAULT_PRESET    "bt709"
+#define HDR_DYNAMIC_METADATA_DEFAULT_PRESET "all"
 
 /* Options */
 static int     debug               = HB_DEBUG_ALL;
@@ -74,7 +75,7 @@ static int     titlescan           = 0;
 static int     main_feature        = 0;
 static char *  native_language     = NULL;
 static int     native_dub          = 0;
-static int     twoPass             = -1;
+static int     multiPass           = -1;
 static int     pad_disable         = 0;
 static char *  pad                 = NULL;
 static int     colorspace_disable  = 0;
@@ -165,7 +166,7 @@ static int      crop_threshold_frames    = 0;
 static char *   vrate                    = NULL;
 static float    vquality                 = HB_INVALID_VIDEO_QUALITY;
 static int      vbitrate                 = 0;
-static int      mux                      = 0;
+static int      mux                      = HB_MUX_INVALID;
 static int      anamorphic_mode     = -1;
 static int      modulus             = 0;
 static int      par_height          = -1;
@@ -185,14 +186,14 @@ static char *   encoder_level   = NULL;
 static char *   advanced_opts   = NULL;
 static int      maxHeight     = 0;
 static int      maxWidth      = 0;
-static int      fastfirstpass = -1;
+static int      fastanalysispass = -1;
 static char *   preset_export_name   = NULL;
 static char *   preset_export_desc   = NULL;
 static char *   preset_export_file   = NULL;
 static char *   preset_name          = NULL;
 static char *   queue_import_name    = NULL;
 static int      cfr           = -1;
-static int      mp4_optimize  = -1;
+static int      optimize      = -1;
 static int      ipod_atom     = -1;
 static int      color_matrix_code = -1;
 static int      preview_count = 10;
@@ -203,12 +204,16 @@ static int      start_at_frame = 0;
 static int64_t  stop_at_pts    = 0;
 static int      stop_at_frame = 0;
 static uint64_t min_title_duration = 10;
+static uint64_t max_title_duration = 0;
 #if HB_PROJECT_FEATURE_QSV
 static int      qsv_async_depth    = -1;
 static int      qsv_adapter        = -1;
 static int      qsv_decode         = -1;
 #endif
 static int      hw_decode          = -1;
+static int      keep_duplicate_titles = 0;
+static int      hdr_dynamic_metadata_disable = 0;
+static char *   hdr_dynamic_metadata  = NULL;
 
 /* Exit cleanly on Ctrl-C */
 static volatile hb_error_code done_error = HB_ERROR_NONE;
@@ -218,7 +223,7 @@ static void SigHandler( int );
 
 /* Utils */
 static void ShowHelp(void);
-static void ShowCommands()
+static void ShowCommands(void)
 {
     fprintf(stdout, "\nCommands:\n");
     fprintf(stdout, " [h]elp    Show this message\n");
@@ -252,7 +257,7 @@ static int stdout_tty = 0;
 static int stderr_tty = 0;
 static char * stdout_sep = "\r";
 static char * stderr_sep = "\r";
-static void test_tty()
+static void test_tty(void)
 {
 #if defined(__MINGW32__)
     HANDLE handle;
@@ -536,7 +541,11 @@ int main( int argc, char ** argv )
     if (queue_import_name != NULL)
     {
         hb_system_sleep_prevent(h);
-        RunQueue(h, queue_import_name);
+        if (RunQueue(h, queue_import_name))
+        {
+            done_error = HB_ERROR_WRONG_INPUT;
+            goto cleanup;
+        }
     }
     else
     {
@@ -594,8 +603,13 @@ int main( int argc, char ** argv )
 
         hb_system_sleep_prevent(h);
 
-        hb_scan2(h, input, titleindex, preview_count, store_previews,
-                min_title_duration * 90000LL, crop_threshold_frames, crop_threshold_pixels);
+        hb_list_t *file_paths = hb_list_init();
+        hb_list_add(file_paths, input);
+        hb_scan(h, file_paths, titleindex, preview_count, store_previews,
+                min_title_duration * 90000LL, max_title_duration * 90000LL,
+                crop_threshold_frames, crop_threshold_pixels,
+                NULL, hw_decode, keep_duplicate_titles);
+        hb_list_close(&file_paths);
 
         EventLoop(h, preset_dict);
         hb_value_free(&preset_dict);
@@ -853,7 +867,7 @@ static void show_progress_json(hb_state_t * state)
     hb_value_free(&state_dict);
     fprintf(stdout, "Progress: %s\n", state_json);
     free(state_json);
-    fflush(stderr);
+    fflush(stdout);
 }
 
 static int HandleEvents(hb_handle_t * h, hb_dict_t *preset_dict)
@@ -1294,7 +1308,7 @@ static void showFilterDefault(FILE* const out, int filter_id)
     fprintf(out, "\n");
 }
 
-static void ShowHelp()
+static void ShowHelp(void)
 {
     int i, clock_min, clock_max, clock;
     const hb_rate_t *rate;
@@ -1314,7 +1328,7 @@ static void ShowHelp()
 "   --json                  Log title, progress, and version info in\n"
 "                           JSON format\n"
 "   -v, --verbose[=number]  Be verbose (optional argument: logging level)\n"
-"   -Z. --preset <string>   Select preset by name (case-sensitive)\n"
+"   -Z, --preset <string>   Select preset by name (case-sensitive)\n"
 "                           Enclose names containing spaces in double quotation\n"
 "                           marks (e.g. \"Preset Name\")\n"
 "   -z, --preset-list       List available presets\n"
@@ -1349,6 +1363,8 @@ static void ShowHelp()
 "                           Shorter titles will be ignored (default: 10).\n"
 "       --scan              Scan selected title only.\n"
 "       --main-feature      Detect and select the main feature title.\n"
+"       --keep-duplicate-titles\n"
+"                           Keep duplicate titles when scanning (Blu-ray only)\n"
 "   -c, --chapters <string> Select chapters (e.g. \"1-3\" for chapters\n"
 "                           1 to 3 or \"3\" for chapter 3 only,\n"
 "                           default: all chapters)\n"
@@ -1436,9 +1452,9 @@ static void ShowHelp()
 "                           specified video encoder\n"
 "   -q, --quality <float>   Set video quality (e.g. 22.0)\n"
 "   -b, --vb <number>       Set video bitrate in kbit/s (default: 1000)\n"
-"   -2, --two-pass          Use two-pass mode\n"
-"       --no-two-pass       Disable two-pass mode\n"
-"   -T, --turbo             When using 2-pass use \"turbo\" options on the\n"
+"   --multi-pass            Use multi-pass mode\n"
+"       --no-multi-pass     Disable multi-pass mode\n"
+"   -T, --turbo             When using multi-pass use \"turbo\" options on the\n"
 "                           first pass to improve speed\n"
 "                           (works with x264 and x265)\n"
 "       --no-turbo          Disable 2-pass mode's \"turbo\" first pass\n"
@@ -1484,8 +1500,18 @@ static void ShowHelp()
 "                           timing if it's below that rate.\n"
 "                           If none of these flags are given, the default\n"
 "                           is --pfr when -r is given and --vfr otherwise\n"
+"   --hdr-dynamic-metadata  <string>\n"
+"                           Set the kind of HDR dynamic metadata to preserve:\n"
+"                               hdr10plus\n"
+"                               dolbyvision\n"
+"                               all\n"
+"   --no-hdr-dynamic-metadata Disable HDR dynamic metadata passthru\n"
 "   --enable-hw-decoding <string>                                        \n"
+#if defined( __APPLE_CC__ )
+"                           Use 'videotoolbox' to enable VideoToolbox    \n"
+#else
 "                           Use 'nvdec' to enable NVDec                  \n"
+#endif
 "   --disable-hw-decoding   Disable hardware decoding of the video track,\n"
 "                           forcing software decoding instead\n"
 
@@ -1501,7 +1527,7 @@ static void ShowHelp()
 "                           matching each language will be added to your\n"
 "                           output. Provide the language's ISO 639-2 code\n"
 "                           (e.g. fre, eng, spa, dut, et cetera)\n"
-"                           Use code 'und' (Unknown) to match all languages.\n"
+"                           Use code 'any' to match all languages.\n"
 "       --all-audio         Select all audio tracks matching languages in\n"
 "                           the specified language list (--audio-lang-list).\n"
 "                           Any language if list is not specified.\n"
@@ -1519,9 +1545,9 @@ static void ShowHelp()
         fprintf(out, "                               %s\n", encoder->short_name);
     }
     fprintf(out,
-"                           \"copy:<type>\" will pass through the corresponding\n"
-"                           audio track without modification, if pass through\n"
-"                           is supported for the audio type.\n"
+"                           \"copy:<type>\" will enable passthru of the \n"
+"                           corresponding audio track without modification\n"
+"                           if passthru is supported for the audio type.\n"
 "                           Separate tracks by commas.\n"
 "                           Defaults:\n");
     container = NULL;
@@ -1972,15 +1998,11 @@ if (hb_qsv_available())
 "                           explicitly synchronized.\n"
 "                           Omit 'number' for zero.\n"
 "                           (default: 4)\n"
-    );
-#if defined(_WIN32) || defined(__MINGW32__)
-    fprintf( out,
 "   --qsv-adapter[=index]\n"
 "                           Set QSV hardware graphics adapter index\n"
 "                           (default: QSV hardware graphics adapter with highest hardware generation)\n"
 "\n"
     );
-#endif
 }
 #endif
 }
@@ -2127,7 +2149,7 @@ static void ShowPresets(hb_value_array_t *presets, int indent, int descriptions)
     }
 }
 
-static double parse_hhmmss_strtok()
+static double parse_hhmmss_strtok(void)
 {
     /* Assumes strtok has already been called on a string.  Intends to parse
      * hh:mm:ss.ss or mm:ss.ss or ss.ss or ss into double seconds.  Actually
@@ -2184,7 +2206,6 @@ static int ParseOptions( int argc, char ** argv )
     #define ENCODER_LEVEL_LIST   291
     #define NORMALIZE_MIX        293
     #define AUDIO_DITHER         294
-    #define QSV_BASELINE         295
     #define QSV_ASYNC_DEPTH      296
     #define QSV_ADAPTER          297
     #define QSV_IMPLEMENTATION   298
@@ -2221,7 +2242,10 @@ static int ParseOptions( int argc, char ** argv )
     #define CROP_THRESHOLD_FRAMES         329
     #define CROP_MODE                     330
     #define HW_DECODE                     331
-    
+    #define KEEP_DUPLICATE_TITLES         332
+    #define MAX_DURATION                  333
+    #define HDR_DYNAMIC_METADATA          334
+
     for( ;; )
     {
         static struct option long_options[] =
@@ -2233,7 +2257,6 @@ static int ParseOptions( int argc, char ** argv )
             { "no-dvdnav",   no_argument,       NULL,    DVDNAV },
 
 #if HB_PROJECT_FEATURE_QSV
-            { "qsv-baseline",         no_argument,       NULL,        QSV_BASELINE,       },
             { "qsv-async-depth",      required_argument, NULL,        QSV_ASYNC_DEPTH,    },
             { "qsv-adapter",          required_argument, NULL,        QSV_ADAPTER         },
             { "qsv-implementation",   required_argument, NULL,        QSV_IMPLEMENTATION, },
@@ -2241,18 +2264,24 @@ static int ParseOptions( int argc, char ** argv )
             { "enable-qsv-decoding",  no_argument,       &qsv_decode, 1,                  },
 #endif
             { "disable-hw-decoding", no_argument,        &hw_decode,  0, },
-            { "enable-hw-decoding",  required_argument,  NULL,  HW_DECODE, },
+            { "enable-hw-decoding",  required_argument,  NULL, HW_DECODE, },
+
+            { "keep-duplicate-titles", no_argument,      NULL, KEEP_DUPLICATE_TITLES },
+
+            { "no-hdr-dynamic-metadata",  no_argument,       &hdr_dynamic_metadata_disable, 1 },
+            { "hdr-dynamic-metadata",     required_argument, NULL, HDR_DYNAMIC_METADATA },
 
             { "format",      required_argument, NULL,    'f' },
             { "input",       required_argument, NULL,    'i' },
             { "output",      required_argument, NULL,    'o' },
             { "optimize",    no_argument,       NULL,        'O' },
-            { "no-optimize", no_argument,       &mp4_optimize, 0 },
+            { "no-optimize", no_argument,       &optimize, 0 },
             { "ipod-atom",   no_argument,       NULL,        'I' },
             { "no-ipod-atom",no_argument,       &ipod_atom,    0 },
 
             { "title",       required_argument, NULL,    't' },
             { "min-duration",required_argument, NULL,    MIN_DURATION },
+            { "max-duration",required_argument, NULL,    MAX_DURATION },
             { "scan",        no_argument,       NULL,    SCAN_ONLY },
             { "main-feature",no_argument,       NULL,    MAIN_FEATURE },
             { "chapters",    required_argument, NULL,    'c' },
@@ -2294,8 +2323,8 @@ static int ParseOptions( int argc, char ** argv )
             { "native-dub",  no_argument,       NULL,    NATIVE_DUB },
             { "encoder",     required_argument, NULL,    'e' },
             { "aencoder",    required_argument, NULL,    'E' },
-            { "two-pass",    no_argument,       NULL,    '2' },
-            { "no-two-pass", no_argument,       &twoPass, 0 },
+            { "multi-pass",    no_argument,     &multiPass, 1 },
+            { "no-multi-pass", no_argument,     &multiPass, 0 },
             { "deinterlace", optional_argument, NULL,    'd' },
             { "no-deinterlace", no_argument,    &yadif_disable,       1 },
             { "bwdif",       optional_argument, NULL,    FILTER_BWDIF },
@@ -2380,7 +2409,7 @@ static int ParseOptions( int argc, char ** argv )
             { "rate",        required_argument, NULL,    'r' },
             { "arate",       required_argument, NULL,    'R' },
             { "turbo",       no_argument,       NULL,    'T' },
-            { "no-turbo",    no_argument,       &fastfirstpass,    0 },
+            { "no-turbo",    no_argument,       &fastanalysispass, 0 },
             { "maxHeight",   required_argument, NULL,    'Y' },
             { "maxWidth",    required_argument, NULL,    'X' },
             { "preset",      required_argument, NULL,    'Z' },
@@ -2527,7 +2556,7 @@ static int ParseOptions( int argc, char ** argv )
                 output = strdup( optarg );
                 break;
             case 'O':
-                mp4_optimize = 1;
+                optimize = 1;
                 break;
             case 'I':
                 ipod_atom = 1;
@@ -2744,9 +2773,6 @@ static int ParseOptions( int argc, char ** argv )
                 {
                     ssaburn = 1 ;
                 }
-                break;
-            case '2':
-                twoPass = 1;
                 break;
             case 'd':
                 free(yadif);
@@ -3060,7 +3086,7 @@ static int ParseOptions( int argc, char ** argv )
                                   "    ");
                 return 1;
             case 'T':
-                fastfirstpass = 1;
+                fastanalysispass = 1;
                 break;
             case 'Y':
                 maxHeight = atoi( optarg );
@@ -3082,6 +3108,10 @@ static int ParseOptions( int argc, char ** argv )
                 break;
             case PREVIEWS:
                 sscanf( optarg, "%i:%i", &preview_count, &store_previews );
+                if (preview_count < 1)
+                {
+                    preview_count = 1;
+                }
                 break;
             case START_AT_PREVIEW:
                 start_at_preview = atoi( optarg );
@@ -3164,6 +3194,9 @@ static int ParseOptions( int argc, char ** argv )
             case MIN_DURATION:
                 min_title_duration = strtol( optarg, NULL, 0 );
                 break;
+            case MAX_DURATION:
+                max_title_duration = strtol( optarg, NULL, 0 );
+                break;
             case FILTER_BWDIF:
                 free(bwdif);
                 if (optarg != NULL)
@@ -3176,9 +3209,6 @@ static int ParseOptions( int argc, char ** argv )
                 } 
                 break;
 #if HB_PROJECT_FEATURE_QSV
-            case QSV_BASELINE:
-                hb_qsv_force_workarounds();
-                break;
             case QSV_ASYNC_DEPTH:
                 qsv_async_depth = atoi(optarg);
                 break;
@@ -3192,14 +3222,46 @@ static int ParseOptions( int argc, char ** argv )
             case HW_DECODE:
                 if( optarg != NULL )
                 {
-                    if( !strcmp( optarg, "nvdec" ) ) {
-                        hw_decode = 4;
+                    if (!strcmp(optarg, "nvdec"))
+                    {
+                        hw_decode = HB_DECODE_SUPPORT_NVDEC;
+                    }
+                    else if (!strcmp(optarg, "videotoolbox"))
+                    {
+#if defined( __APPLE_CC__ )
+                        if (__builtin_available(macOS 13, *))
+                        {
+                            hw_decode = HB_DECODE_SUPPORT_VIDEOTOOLBOX;
+                        }
+                        else
+                        {
+                            fprintf( stderr, "videotoolbox hardware decoders require macOS 13 and later");
+                        }
+#endif
+                    }
+                    else if (!strcmp(optarg, "mf"))
+                    {
+                        hw_decode = HB_DECODE_SUPPORT_MF;
                     }
                     else
                     {
                         hw_decode = 0;
                     }
                 } break;
+            case KEEP_DUPLICATE_TITLES:
+                keep_duplicate_titles = 1;
+                break;
+            case HDR_DYNAMIC_METADATA:
+                free(hdr_dynamic_metadata);
+                if (optarg != NULL)
+                {
+                    hdr_dynamic_metadata = strdup(optarg);
+                }
+                else
+                {
+                    hdr_dynamic_metadata = strdup(HDR_DYNAMIC_METADATA_DEFAULT_PRESET);
+                }
+                break;
             case ':':
                 fprintf( stderr, "missing parameter (%s)\n", argv[cur_optind] );
                 return -1;
@@ -3537,6 +3599,16 @@ static int ParseOptions( int argc, char ** argv )
         }
     }
 
+    if (hdr_dynamic_metadata != NULL)
+    {
+        if (hdr_dynamic_metadata_disable)
+        {
+            fprintf(stderr,
+                    "Incompatible options --hdr-dynamic-metadata and --no-hdr-dynamic-metadata\n");
+            return -1;
+        }
+    }
+
     return 0;
 }
 
@@ -3548,7 +3620,24 @@ static int foreign_audio_scan(char **subtracks)
         int ii;
         for (ii = 0; ii < count; ii++)
         {
-            if (!strcasecmp(subtracks[0], "scan"))
+            if (!strcasecmp(subtracks[ii], "scan"))
+            {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static int subtitles_none(char **subtracks)
+{
+    if (subtracks != NULL)
+    {
+        int count = hb_str_vlen(subtracks);
+        int ii;
+        for (ii = 0; ii < count; ii++)
+        {
+            if (!strcasecmp(subtracks[0], "none"))
             {
                 return 1;
             }
@@ -3673,6 +3762,8 @@ static hb_dict_t * PreparePreset(const char *preset_name)
 {
     int ii;
     hb_dict_t *preset;
+    int preset_mux;
+    const char *preset_format;
 
     if (preset_name != NULL)
     {
@@ -3703,9 +3794,11 @@ static hb_dict_t * PreparePreset(const char *preset_name)
     {
         hb_dict_set(preset, "FileFormat", hb_value_string(format));
     }
-    if (mp4_optimize != -1)
+    preset_format = hb_dict_get_string(preset, "FileFormat");
+    preset_mux = hb_container_get_from_name(preset_format);
+    if (optimize != -1)
     {
-        hb_dict_set(preset, "Mp4HttpOptimize", hb_value_bool(mp4_optimize));
+        hb_dict_set(preset, "Optimize", hb_value_bool(optimize));
     }
     if (ipod_atom != -1)
     {
@@ -3764,6 +3857,10 @@ static hb_dict_t * PreparePreset(const char *preset_name)
         hb_dict_set(preset, "SubtitleAddForeignAudioSubtitle",
                     hb_value_bool(1));
     }
+    if (hb_str_vlen(subtracks) > 0)
+    {
+        hb_dict_set(preset, "SubtitleAddForeignAudioSearch", hb_value_bool(0));
+    }
     if (foreign_audio_scan(subtracks))
     {
         // Add foreign audio search
@@ -3807,7 +3904,7 @@ static hb_dict_t * PreparePreset(const char *preset_name)
     {
         selection = subtitle_all == 1 ? "all" : "first";
     }
-    else if (subtitle_track_count > 0)
+    else if (subtitle_track_count > 0 || subtitles_none(subtracks))
     {
         selection = "none";
     }
@@ -3900,6 +3997,7 @@ static hb_dict_t * PreparePreset(const char *preset_name)
             list = hb_value_array_init();
             hb_dict_set(preset, "AudioList", list);
         }
+        int list_len = hb_value_array_len(list);
         int count = MAX(hb_str_vlen(mixdowns),
                     MAX(hb_str_vlen(dynamic_range_compression),
                     MAX(hb_str_vlen(audio_gain),
@@ -3912,301 +4010,278 @@ static hb_dict_t * PreparePreset(const char *preset_name)
                     MAX(hb_str_vlen(acodecs),
                         hb_str_vlen(anames)))))))))));
 
-        hb_dict_t *audio_dict, *last_audio_dict = NULL;
-        // Add audio dict entries to list if needed
-        for (ii = 0; ii < count; ii++)
+        if (list_len < count)
         {
-            audio_dict = hb_value_array_get(list, ii);
-            if (audio_dict == NULL)
+            // More command line settings specified than preset currently supports.
+            // Duplicate the last audio encoder settings in the preset or create a
+            // new one if the preset audio list is empty.
+            hb_dict_t *audio_dict_stub;
+            int new_dict = 0;
+            if (list_len == 0)
             {
-                break;
+                audio_dict_stub = hb_dict_init();
+                new_dict = 1;
             }
-            last_audio_dict = audio_dict;
-        }
-        // More settings specified than preset currently supports.
-        // Duplicate the last audio encoder settings in the preset.
-        for (; ii < count && last_audio_dict != NULL; ii++)
-        {
-            audio_dict = hb_value_dup(last_audio_dict);
-            hb_value_array_append(list, audio_dict);
+            else
+            {
+                audio_dict_stub = hb_value_dup(hb_value_array_get(list, list_len - 1));
+            }
+
+            // The command line allows a shortcut where the final audio
+            // setting listed in the comma separated list gets
+            // replicated and applied to any remaining entries.
+            // If the setting is not specified at all or the comma separated
+            // list end in a `,`, defaults are used.
+            // some_setting[last][0] == 0 indicates the list ended in `,`
+            int last = hb_str_vlen(acodecs) - 1;
+            if (last >= 0 && acodecs[last][0] != 0)
+            {
+                hb_dict_set(audio_dict_stub, "AudioEncoder",
+                             hb_value_string(acodecs[last]));
+            }
+            else if (new_dict)
+            {
+                // If we created a new dict, populate AudioEncoder as
+                // it is a required entry
+                const char *enc;
+                enc = hb_audio_encoder_get_short_name(
+                        hb_audio_encoder_get_default(preset_mux));
+                hb_dict_set(audio_dict_stub, "AudioEncoder",
+                        hb_value_string(enc));
+            }
+            last = hb_str_vlen(abitrates) - 1;
+            int last_q = hb_str_vlen(aqualities) - 1;
+            if (last_q > last && aqualities[last_q][0] != 0)
+            {
+                hb_dict_set(audio_dict_stub, "AudioTrackQualityEnable",
+                            hb_value_bool(1));
+                hb_dict_set(audio_dict_stub, "AudioTrackQuality",
+                    hb_value_double(strtod(aqualities[last_q], NULL)));
+            }
+            else if (last >= 0 && abitrates[last][0] != 0)
+            {
+                hb_dict_set(audio_dict_stub, "AudioBitrate",
+                    hb_value_int(atoi(abitrates[last])));
+            }
+            else if (new_dict)
+            {
+                // If we created a new dict, populate AudioBitrate as
+                // it is a required entry
+                //
+                // hb_sanitize_audio_settings will select a default bitrate
+                // based on samplerate and mixdown
+                hb_dict_set(audio_dict_stub, "AudioBitrate", hb_value_int(-1));
+            }
+            last = hb_str_vlen(mixdowns) - 1;
+            if (last >= 0 && mixdowns[last][0] != 0)
+            {
+                hb_dict_set(audio_dict_stub, "AudioMixdown",
+                            hb_value_string(mixdowns[last]));
+            }
+            last = hb_str_vlen(dynamic_range_compression) - 1;
+            if (last >= 0 && dynamic_range_compression[last][0] != 0)
+            {
+                hb_dict_set(audio_dict_stub, "AudioTrackDRCSlider",
+                    hb_value_double(strtod(dynamic_range_compression[last],
+                                    NULL)));
+            }
+            last = hb_str_vlen(audio_gain) - 1;
+            if (last >= 0 && audio_gain[last][0] != 0)
+            {
+                hb_dict_set(audio_dict_stub, "AudioTrackGainSlider",
+                  hb_value_double(strtod(audio_gain[last], NULL)));
+            }
+            last = hb_str_vlen(audio_dither) - 1;
+            if (last >= 0 && audio_dither[last][0] != 0)
+            {
+                hb_dict_set(audio_dict_stub, "AudioDitherMethod",
+                        hb_value_string(audio_dither[last]));
+            }
+            last = hb_str_vlen(normalize_mix_level) - 1;
+            if (last >= 0 && normalize_mix_level[last][0] != 0)
+            {
+                hb_dict_set(audio_dict_stub, "AudioNormalizeMixLevel",
+                    hb_value_bool(atoi(normalize_mix_level[last])));
+            }
+            last = hb_str_vlen(arates) - 1;
+            if (last >= 0 && arates[last][0] != 0)
+            {
+                hb_dict_set(audio_dict_stub, "AudioSamplerate",
+                            hb_value_string(arates[last]));
+            }
+            last = hb_str_vlen(acompressions) - 1;
+            if (last >= 0 && acompressions[last][0] != 0)
+            {
+                hb_dict_set(audio_dict_stub, "AudioCompressionLevel",
+                  hb_value_double(strtod(acompressions[last], NULL)));
+            }
+            // Add entries to preset audio list for extra command line options
+            for (ii = list_len; ii < count; ii++)
+            {
+                hb_value_array_append(list, hb_value_dup(audio_dict_stub));
+            }
+            hb_dict_free(&audio_dict_stub);
         }
 
-        // Update codecs
+        hb_dict_t *audio_dict;
+
+        // Override command line specified codecs
         if (hb_str_vlen(acodecs) > 0)
         {
-            int last = -1;
-            for (ii = 0; acodecs[ii] != NULL &&
-                         acodecs[ii][0] != 0; ii++)
+            for (ii = 0; acodecs[ii] != NULL; ii++)
             {
-                audio_dict = hb_value_array_get(list, ii);
-                hb_dict_set(audio_dict, "AudioEncoder",
-                                    hb_value_string(acodecs[ii]));
-                last = ii;
-            }
-            if (last_audio_dict == NULL && last >= 0)
-            {
-                // No defaults exist in original preset.
-                // Apply last codec in list to all other entries
-                for (; ii < count; ii++)
+                if (acodecs[ii][0] != 0)
                 {
                     audio_dict = hb_value_array_get(list, ii);
                     hb_dict_set(audio_dict, "AudioEncoder",
-                                        hb_value_string(acodecs[last]));
+                                hb_value_string(acodecs[ii]));
                 }
             }
         }
 
-        // Update bitrates
-        int last_bitrate = -1;
+        // Override command line specified bitrates
         if (hb_str_vlen(abitrates) > 0)
         {
-            for (ii = 0; abitrates[ii]    != NULL &&
-                         abitrates[ii][0] != 0; ii++)
+            for (ii = 0; abitrates[ii] != NULL; ii++)
             {
-                audio_dict = hb_value_array_get(list, ii);
-                hb_dict_set(audio_dict, "AudioBitrate",
-                    hb_value_int(atoi(abitrates[ii])));
-                last_bitrate = ii;
+                if (abitrates[ii][0] != 0)
+                {
+                    audio_dict = hb_value_array_get(list, ii);
+                    hb_dict_set(audio_dict, "AudioBitrate",
+                        hb_value_int(atoi(abitrates[ii])));
+                }
             }
         }
 
-        // Update qualities
-        int last_quality = -1;
+        // Override command line specified qualities
         if (hb_str_vlen(aqualities) > 0)
         {
-            for (ii = 0; aqualities[ii] != NULL &&
-                         aqualities[ii][0] != 0; ii++)
+            for (ii = 0; aqualities[ii] != NULL; ii++)
             {
-                audio_dict = hb_value_array_get(list, ii);
-                hb_dict_set(audio_dict, "AudioTrackQualityEnable",
-                            hb_value_bool(1));
-                hb_dict_set(audio_dict, "AudioTrackQuality",
-                    hb_value_double(strtod(aqualities[ii], NULL)));
-                last_quality = ii;
-            }
-            if (last_audio_dict == NULL)
-            {
-                // No defaults exist in original preset.
-                // Apply last bitrate/quality in list to all other entries
-                if (last_bitrate > last_quality)
+                if (aqualities[ii][0] != 0)
                 {
-                    ii = last_bitrate + 1;
-                    for (; ii < count; ii++)
-                    {
-                        audio_dict = hb_value_array_get(list, ii);
-                        hb_dict_set(audio_dict, "AudioBitrate",
-                            hb_value_int(atoi(abitrates[last_bitrate])));
-                    }
-                }
-                else if (last_quality >= 0)
-                {
-                    ii = last_quality + 1;
-                    for (; ii < count; ii++)
-                    {
-                        audio_dict = hb_value_array_get(list, ii);
-                        hb_dict_set(audio_dict, "AudioTrackQualityEnable",
-                                    hb_value_bool(1));
-                        hb_dict_set(audio_dict, "AudioTrackQuality",
-                            hb_value_double(strtod(aqualities[last_quality], NULL)));
-                    }
+                    audio_dict = hb_value_array_get(list, ii);
+                    hb_dict_set(audio_dict, "AudioTrackQualityEnable",
+                                hb_value_bool(1));
+                    hb_dict_set(audio_dict, "AudioTrackQuality",
+                        hb_value_double(strtod(aqualities[ii], NULL)));
                 }
             }
         }
 
 
-        // Update samplerates
+        // Override command line specified samplerates
         if (hb_str_vlen(arates) > 0)
         {
-            int last = -1;
-            for (ii = 0; arates[ii]    != NULL &&
-                         arates[ii][0] != 0; ii++)
+            for (ii = 0; arates[ii] != NULL; ii++)
             {
-                audio_dict = hb_value_array_get(list, ii);
-                hb_dict_set(audio_dict, "AudioSamplerate",
-                            hb_value_string(arates[ii]));
-                last = ii;
-            }
-            if (last_audio_dict == NULL && last >= 0)
-            {
-                // No defaults exist in original preset.
-                // Apply last samplerate in list to all other entries
-                for (; ii < count; ii++)
+                if (arates[ii][0] != 0)
                 {
                     audio_dict = hb_value_array_get(list, ii);
                     hb_dict_set(audio_dict, "AudioSamplerate",
-                                hb_value_string(arates[last]));
+                                hb_value_string(arates[ii]));
                 }
             }
         }
 
-        // Update mixdowns
+        // Override command line specified mixdowns
         if (hb_str_vlen(mixdowns) > 0)
         {
-            int last = -1;
-            for (ii = 0; mixdowns[ii]    != NULL &&
-                         mixdowns[ii][0] != 0; ii++)
+            for (ii = 0; mixdowns[ii] != NULL; ii++)
             {
-                audio_dict = hb_value_array_get(list, ii);
-                hb_dict_set(audio_dict, "AudioMixdown",
-                            hb_value_string(mixdowns[ii]));
-                last = ii;
-            }
-            if (last_audio_dict == NULL && last >= 0)
-            {
-                // No defaults exist in original preset.
-                // Apply last codec in list to all other entries
-                for (; ii < count; ii++)
+                if (mixdowns[ii][0] != 0)
                 {
                     audio_dict = hb_value_array_get(list, ii);
                     hb_dict_set(audio_dict, "AudioMixdown",
-                                hb_value_string(mixdowns[last]));
+                                hb_value_string(mixdowns[ii]));
                 }
             }
         }
 
-        // Update mixdowns normalization
+        // Override command line specified mixdowns normalization
         if (hb_str_vlen(normalize_mix_level) > 0)
         {
-            int last = -1;
-            for (ii = 0; normalize_mix_level[ii]    != NULL &&
-                         normalize_mix_level[ii][0] != 0; ii++)
+            for (ii = 0; normalize_mix_level[ii] != NULL; ii++)
             {
-                audio_dict = hb_value_array_get(list, ii);
-                hb_dict_set(audio_dict, "AudioNormalizeMixLevel",
-                    hb_value_bool(atoi(normalize_mix_level[ii])));
-                last = ii;
-            }
-            if (last_audio_dict == NULL && last >= 0)
-            {
-                // No defaults exist in original preset.
-                // Apply last mix norm in list to all other entries
-                for (; ii < count; ii++)
+                if (normalize_mix_level[ii][0] != 0)
                 {
                     audio_dict = hb_value_array_get(list, ii);
-                    hb_dict_set(audio_dict,
-                                "AudioNormalizeMixLevel",
-                        hb_value_bool(
-                            atoi(normalize_mix_level[last])));
+                    hb_dict_set(audio_dict, "AudioNormalizeMixLevel",
+                        hb_value_bool(atoi(normalize_mix_level[ii])));
                 }
             }
         }
 
-        // Update DRC
+        // Override command line specified DRC
         if (hb_str_vlen(dynamic_range_compression) > 0)
         {
-            int last = -1;
-            for (ii = 0;dynamic_range_compression[ii]    != NULL &&
-                        dynamic_range_compression[ii][0] != 0; ii++)
+            for (ii = 0; dynamic_range_compression[ii] != NULL; ii++)
             {
-                audio_dict = hb_value_array_get(list, ii);
-                hb_dict_set(audio_dict, "AudioTrackDRCSlider",
-                  hb_value_double(
-                    strtod(dynamic_range_compression[ii], NULL)));
-                last = ii;
-            }
-            if (last_audio_dict == NULL && last >= 0)
-            {
-                // No defaults exist in original preset.
-                // Apply last DRC in list to all other entries
-                for (; ii < count; ii++)
+                if (dynamic_range_compression[ii][0] != 0)
                 {
                     audio_dict = hb_value_array_get(list, ii);
                     hb_dict_set(audio_dict, "AudioTrackDRCSlider",
-                        hb_value_double(
-                            strtod(dynamic_range_compression[last],
-                                   NULL)));
+                      hb_value_double(
+                        strtod(dynamic_range_compression[ii], NULL)));
                 }
             }
         }
 
-        // Update Gain
+        // Override command line specified Gain
         if (hb_str_vlen(audio_gain) > 0)
         {
-            int last = -1;
-            for (ii = 0; audio_gain[ii]    != NULL &&
-                         audio_gain[ii][0] != 0; ii++)
+            for (ii = 0; audio_gain[ii] != NULL; ii++)
             {
-                audio_dict = hb_value_array_get(list, ii);
-                hb_dict_set(audio_dict, "AudioTrackGainSlider",
-                  hb_value_double(
-                    strtod(audio_gain[ii], NULL)));
-                last = ii;
-            }
-            if (last_audio_dict == NULL && last >= 0)
-            {
-                // No defaults exist in original preset.
-                // Apply last gain in list to all other entries
-                for (; ii < count; ii++)
+                if (audio_gain[ii][0] != 0)
                 {
                     audio_dict = hb_value_array_get(list, ii);
                     hb_dict_set(audio_dict, "AudioTrackGainSlider",
                       hb_value_double(
-                        strtod(audio_gain[last], NULL)));
+                        strtod(audio_gain[ii], NULL)));
                 }
             }
         }
 
-        // Update dither method
+        // Override command line specified dither method
         if (hb_str_vlen(audio_dither) > 0)
         {
-            int last = -1;
-            for (ii = 0; audio_dither[ii]    != NULL &&
-                         audio_dither[ii][0] != 0; ii++)
+            for (ii = 0; audio_dither[ii] != NULL; ii++)
             {
-                audio_dict = hb_value_array_get(list, ii);
-                hb_dict_set(audio_dict, "AudioDitherMethod",
-                            hb_value_string(audio_dither[ii]));
-                last = ii;
-            }
-            if (last_audio_dict == NULL && last >= 0)
-            {
-                // No defaults exist in original preset.
-                // Apply last dither in list to all other entries
-                for (; ii < count; ii++)
+                if (audio_dither[ii][0] != 0)
                 {
                     audio_dict = hb_value_array_get(list, ii);
                     hb_dict_set(audio_dict, "AudioDitherMethod",
-                            hb_value_string(audio_dither[last]));
+                                hb_value_string(audio_dither[ii]));
                 }
             }
         }
 
-        // Update compression
+        // Override command line specified compression
         if (hb_str_vlen(acompressions) > 0)
         {
-            int last = -1;
-            for (ii = 0; acompressions[ii]    != NULL &&
-                         acompressions[ii][0] != 0; ii++)
+            for (ii = 0; acompressions[ii] != NULL; ii++)
             {
-                audio_dict = hb_value_array_get(list, ii);
-                hb_dict_set(audio_dict, "AudioCompressionLevel",
-                  hb_value_double(
-                    strtod(acompressions[ii], NULL)));
-                last = ii;
-            }
-            if (last_audio_dict == NULL && last >= 0)
-            {
-                // No defaults exist in original preset.
-                // Apply last compression in list to all other entries
-                for (; ii < count; ii++)
+                if (acompressions[ii][0] != 0)
                 {
                     audio_dict = hb_value_array_get(list, ii);
                     hb_dict_set(audio_dict, "AudioCompressionLevel",
                       hb_value_double(
-                        strtod(acompressions[last], NULL)));
+                        strtod(acompressions[ii], NULL)));
                 }
             }
         }
 
-        // Update track names
+        // Override command line specified track names
         if (hb_str_vlen(anames) > 0)
         {
-            for (ii = 0; anames[ii]    != NULL &&
-                         anames[ii][0] != 0; ii++)
+            for (ii = 0; anames[ii] != NULL; ii++)
             {
-                audio_dict = hb_value_array_get(list, ii);
-                hb_dict_set(audio_dict, "AudioTrackName",
-                                    hb_value_string(anames[ii]));
+                if (anames[ii][0] != 0)
+                {
+                    audio_dict = hb_value_array_get(list, ii);
+                    hb_dict_set(audio_dict, "AudioTrackName",
+                                        hb_value_string(anames[ii]));
+                }
             }
         }
     }
@@ -4272,22 +4347,22 @@ static hb_dict_t * PreparePreset(const char *preset_name)
     {
         hb_dict_set(preset, "VideoQualityType", hb_value_int(1));
         hb_dict_set(preset, "VideoAvgBitrate", hb_value_int(vbitrate));
-        if (twoPass == 1)
-        {
-            hb_dict_set(preset, "VideoTwoPass", hb_value_bool(1));
-        }
-        else if (twoPass == 0)
-        {
-            hb_dict_set(preset, "VideoTwoPass", hb_value_bool(0));
-        }
-        if (fastfirstpass == 1)
-        {
-            hb_dict_set(preset, "VideoTurboTwoPass", hb_value_bool(1));
-        }
-        else if (fastfirstpass == 0)
-        {
-            hb_dict_set(preset, "VideoTurboTwoPass", hb_value_bool(0));
-        }
+    }
+    if (multiPass == 1)
+    {
+        hb_dict_set(preset, "VideoMultiPass", hb_value_bool(1));
+    }
+    else if (multiPass == 0)
+    {
+        hb_dict_set(preset, "VideoMultiPass", hb_value_bool(0));
+    }
+    if (fastanalysispass == 1)
+    {
+        hb_dict_set(preset, "VideoTurboMultiPass", hb_value_bool(1));
+    }
+    else if (fastanalysispass == 0)
+    {
+        hb_dict_set(preset, "VideoTurboMultiPass", hb_value_bool(0));
     }
     const char *vrate_preset;
     const char *cfr_preset;
@@ -4340,6 +4415,14 @@ static hb_dict_t * PreparePreset(const char *preset_name)
     {
         hb_dict_set(preset, "VideoHWDecode", hb_value_int(hw_decode));
     }
+    if (hdr_dynamic_metadata_disable)
+    {
+        hb_dict_set(preset, "VideoPasshtruHDRDynamicMetadata", hb_value_string("off"));
+    }
+    if (hdr_dynamic_metadata != NULL)
+    {
+        hb_dict_set(preset, "VideoPasshtruHDRDynamicMetadata", hb_value_string(hdr_dynamic_metadata));
+    }
     if (maxWidth > 0)
     {
         hb_dict_set(preset, "PictureWidth", hb_value_int(maxWidth));
@@ -4365,7 +4448,6 @@ static hb_dict_t * PreparePreset(const char *preset_name)
     // otherwise use --crop-mode to set mode.
     if (crop[0] >= 0 || crop[1] >= 0 || crop[2] >= 0 || crop[3] >= 0)
     {
-        hb_dict_set(preset, "PictureAutoCrop", hb_value_bool(0));
         hb_dict_set(preset, "PictureCropMode", hb_value_int(3));
         
         if (crop[0] >= 0)
@@ -4396,8 +4478,6 @@ static hb_dict_t * PreparePreset(const char *preset_name)
     else if (crop_mode != NULL && !strcmp(crop_mode, "none")) 
     {
         hb_dict_set(preset, "PictureCropMode",  hb_value_int(2));
-    } else {
-        hb_dict_set(preset, "PictureCropMode",  hb_value_int(0)); // Automatic
     }
 
     if (display_width > 0)
@@ -4920,9 +5000,10 @@ PrepareJob(hb_handle_t *h, hb_title_t *title, hb_dict_t *preset_dict)
                     hb_value_int(range_seek_points));
     }
 
+    hb_dict_t *source_dict = hb_dict_get(job_dict, "Source");
+
     if (angle)
     {
-        hb_dict_t *source_dict = hb_dict_get(job_dict, "Source");
         hb_dict_set(source_dict, "Angle", hb_value_int(angle));
     }
 
@@ -5313,7 +5394,7 @@ PrepareJob(hb_handle_t *h, hb_title_t *title, hb_dict_t *preset_dict)
     int one_burned = 0;
     if (subtracks != NULL)
     {
-        int ii, track_count, out_track = 0;
+        int ii, out_track = 0;
         for (ii = 0; subtracks[ii] != NULL; ii++)
         {
             if (strcasecmp(subtracks[ii], "none" ) == 0)
@@ -5359,26 +5440,6 @@ PrepareJob(hb_handle_t *h, hb_title_t *title, hb_dict_t *preset_dict)
             else
             {
                 fprintf(stderr, "ERROR: unable to parse subtitle input \"%s\", skipping\n", subtracks[ii]);
-            }
-        }
-        track_count = hb_value_array_len(subtitle_array);
-
-        /* Subtitle Track Names */
-        ii = 0;
-        if (subnames != NULL)
-        {
-            for (; subnames[ii] != NULL && ii < track_count; ii++)
-            {
-                if (*subnames[ii])
-                {
-                    subtitle_dict = hb_value_array_get(subtitle_array, ii);
-                    hb_dict_set(subtitle_dict, "Name",
-                                hb_value_string(subnames[ii]));
-                }
-            }
-            if (subnames[ii] != NULL)
-            {
-                fprintf(stderr, "Dropping excess subtitle track names\n");
             }
         }
     }
@@ -5442,6 +5503,26 @@ PrepareJob(hb_handle_t *h, hb_title_t *title, hb_dict_t *preset_dict)
         for (ii = 0; ssafile[ii] != NULL; ii++)
         {
             add_ssa(subtitle_array, ii, &one_burned);
+        }
+    }
+
+    int ii = 0, track_count = hb_value_array_len(subtitle_array);
+
+    /* Subtitle Track Names */
+    if (subnames != NULL)
+    {
+        for (; subnames[ii] != NULL && ii < track_count; ii++)
+        {
+            if (*subnames[ii])
+            {
+                subtitle_dict = hb_value_array_get(subtitle_array, ii);
+                hb_dict_set(subtitle_dict, "Name",
+                            hb_value_string(subnames[ii]));
+            }
+        }
+        if (subnames[ii] != NULL)
+        {
+            fprintf(stderr, "Dropping excess subtitle track names\n");
         }
     }
 

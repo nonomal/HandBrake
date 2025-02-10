@@ -39,9 +39,8 @@
                     "FileFormat": "mp4",
                     "Folder": false,
                     "FolderOpen": false,
-                    "Mp4HttpOptimize": false,
+                    "Optimize": false,
                     "Mp4iPodCompatible": false,
-                    "PictureAutoCrop": true,
                     "PictureCropMode": 0,
                     "PictureBottomCrop": 0,
                     "PictureLeftCrop": 0,
@@ -112,8 +111,9 @@
                     "VideoQualitySlider": 22.0,
                     "VideoQSVDecode": false,
                     "VideoHWDecode": 0,
-                    "VideoTwoPass": false,
-                    "VideoTurboTwoPass": false,
+                    "VideoMultiPass": false,
+                    "VideoTurboMultiPass": false,
+                    "VideoPasshtruHDRDynamicMetadata": "all",
                     "x264Option": "",
                     "x264UseAdvancedOptions": false
                 }

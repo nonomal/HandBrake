@@ -1,7 +1,7 @@
 /* nlmeans.c
 
    Copyright (c) 2013 Dirk Farin
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -106,7 +106,7 @@ typedef struct
     int height;
     int fmt;
     BorderedPlane plane[3];
-    hb_buffer_settings_t s;
+    hb_buffer_t *buf;        // input buf sidedata
 } Frame;
 
 struct PixelSum
@@ -223,6 +223,11 @@ static int nlmeans_init(hb_filter_object_t *filter,
                            hb_filter_init_t *init)
 {
     filter->private_data = calloc(sizeof(struct hb_filter_private_s), 1);
+    if (filter->private_data == NULL)
+    {
+        hb_error("nlmeans: calloc failed");
+        return -1;
+    }
     hb_filter_private_t *pv = filter->private_data;
     NLMeansFunctions *functions = &pv->functions;
 
@@ -333,6 +338,9 @@ static int nlmeans_init(hb_filter_object_t *filter,
 
         if (pv->max_frames < pv->nframes[c]) pv->max_frames = pv->nframes[c];
 
+        // Scale strength with bit depth
+        pv->strength[c] *= pv->depth > 8 ? (pv->depth - 8) * (pv->depth - 8) : 1;
+
         // Precompute exponential table
         float *exptable = &pv->exptable[c][0];
         float *weight_fact_table = &pv->weight_fact_table[c];
@@ -365,6 +373,11 @@ static int nlmeans_init(hb_filter_object_t *filter,
     hb_log("NLMeans using %i threads", pv->threads);
 
     pv->frame = calloc(pv->threads + pv->max_frames, sizeof(Frame));
+    if (pv->frame == NULL)
+    {
+        hb_error("nlmeans: calloc failed");
+        goto fail;
+    }
     for (int ii = 0; ii < pv->threads + pv->max_frames; ii++)
     {
         for (int c = 0; c < 3; c++)
@@ -429,6 +442,7 @@ static void nlmeans_close(hb_filter_object_t *filter)
                 free(pv->frame[f].plane[c].mem);
                 pv->frame[f].plane[c].mem = NULL;
             }
+            hb_buffer_close(&pv->frame[f].buf);
         }
     }
 
@@ -501,9 +515,9 @@ static void nlmeans_filter_work(void *thread_args_v)
                           pv->weight_fact_table[c],
                           pv->diff_max[c]);
     }
-    buf->s = pv->frame[segment].s;
+    hb_buffer_copy_props(buf, pv->frame[segment].buf);
+    hb_buffer_close(&pv->frame[segment].buf);
     thread_data->out = buf;
-
 }
 
 static void nlmeans_add_frame(hb_filter_private_t *pv, hb_buffer_t *buf)
@@ -518,11 +532,13 @@ static void nlmeans_add_frame(hb_filter_private_t *pv, hb_buffer_t *buf)
                           buf->plane[c].height,
                           &pv->frame[pv->next_frame].plane[c],
                           border);
-        pv->frame[pv->next_frame].s = buf->s;
-        pv->frame[pv->next_frame].width = buf->f.width;
-        pv->frame[pv->next_frame].height = buf->f.height;
-        pv->frame[pv->next_frame].fmt = buf->f.fmt;
     }
+    pv->frame[pv->next_frame].width = buf->f.width;
+    pv->frame[pv->next_frame].height = buf->f.height;
+    pv->frame[pv->next_frame].fmt = buf->f.fmt;
+    pv->frame[pv->next_frame].buf = hb_buffer_init(0);
+    hb_buffer_copy_props(pv->frame[pv->next_frame].buf, buf);
+
     pv->next_frame++;
 }
 
@@ -639,7 +655,8 @@ static hb_buffer_t * nlmeans_filter_flush(hb_filter_private_t *pv)
                               pv->weight_fact_table[c],
                               pv->diff_max[c]);
         }
-        buf->s = frame->s;
+        hb_buffer_copy_props(buf, frame->buf);
+        hb_buffer_close(&frame->buf);
         hb_buffer_list_append(&list, buf);
     }
     return hb_buffer_list_clear(&list);

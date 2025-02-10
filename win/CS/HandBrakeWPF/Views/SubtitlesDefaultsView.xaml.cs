@@ -9,13 +9,25 @@
 
 namespace HandBrakeWPF.Views
 {
+    using System;
+
+    using HandBrakeWPF.Helpers;
     using System.Windows;
+    using HandBrakeWPF.Commands;
+    using System.Windows.Input;
 
     public partial class SubtitlesDefaultsView : Window
     {
         public SubtitlesDefaultsView()
         {
             this.InitializeComponent();
+            this.InputBindings.Add(new InputBinding(new CloseWindowCommand(this), new KeyGesture(Key.W, ModifierKeys.Control))); // Close Window
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            WindowHelper.SetDarkMode(this);
         }
     }
 }

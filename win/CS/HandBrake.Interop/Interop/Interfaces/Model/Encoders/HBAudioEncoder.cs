@@ -17,7 +17,7 @@ namespace HandBrake.Interop.Interop.Interfaces.Model.Encoders
         public const string Vorbis = "vorbis";
         public const string Passthru = "copy";
 
-        public static HBAudioEncoder None = new HBAudioEncoder(-1, null, 1, 1, "None", -1, null, "none");
+        public static HBAudioEncoder None = HandBrakeEncoderHelpers.NoneAudioEncoder;
 
         public HBAudioEncoder(int compatibleContainers, RangeLimits compressionLimits, float defaultCompression, float defaultQuality, string displayName, int id, RangeLimits qualityLimits, string shortName)
         {
@@ -71,9 +71,9 @@ namespace HandBrake.Interop.Interop.Interfaces.Model.Encoders
         public int Id { get; private set; }
 
         /// <summary>
-        /// Gets a value indicating whether the encoder is passthrough.
+        /// Gets a value indicating whether the encoder is passthru.
         /// </summary>
-        public bool IsPassthrough
+        public bool IsPassthru
         {
             get
             {
@@ -102,6 +102,14 @@ namespace HandBrake.Interop.Interop.Interfaces.Model.Encoders
             get
             {
                 return (this.CompatibleContainers & NativeConstants.HB_MUX_MASK_WEBM) > 0 || this.CompatibleContainers == -1;
+            }
+        }
+
+        public bool SupportsMkv
+        {
+            get
+            {
+                return (this.CompatibleContainers & NativeConstants.HB_MUX_MASK_MKV) > 0 || this.CompatibleContainers == -1;
             }
         }
 
@@ -143,6 +151,36 @@ namespace HandBrake.Interop.Interop.Interfaces.Model.Encoders
             {
                 return this.ShortName.Contains("flac"); // TODO Find a better way to do this. 
             }
+        }
+
+        protected bool Equals(HBAudioEncoder other)
+        {
+            return this.ShortName == other.ShortName;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj))
+            {
+                return false;
+            }
+
+            if (ReferenceEquals(this, obj))
+            {
+                return true;
+            }
+
+            if (obj.GetType() != this.GetType())
+            {
+                return false;
+            }
+
+            return Equals((HBAudioEncoder)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return (this.ShortName != null ? this.ShortName.GetHashCode() : 0);
         }
     }
 }

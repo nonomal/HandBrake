@@ -25,6 +25,8 @@ namespace HandBrakeWPF.Services.Queue.Model
         private QueueItemStatus status;
         private string presetKey;
 
+        private bool isShuttingDown;
+
         public QueueTask()
         {
             this.Status = QueueItemStatus.Waiting;
@@ -39,13 +41,13 @@ namespace HandBrakeWPF.Services.Queue.Model
             this.TaskType = type;
             id = id + 1;
             this.Id = string.Format("{0}.{1}", GeneralUtilities.ProcessId, id);
-            this.NotifyOfPropertyChange(() => this.IsBreakpointTask);
         }
 
         public QueueTask(EncodeTask task, string scannedSourcePath, Preset currentPreset, bool isPresetModified, Title selectedTitle)
         {
             this.SourceTitleInfo = selectedTitle;
             this.Task = task;
+            this.Task.KeepDuplicateTitles = selectedTitle.KeepDuplicateTitles;
             this.Status = QueueItemStatus.Waiting;
             this.ScannedSourcePath = scannedSourcePath;
             if (currentPreset != null)
@@ -61,6 +63,7 @@ namespace HandBrakeWPF.Services.Queue.Model
             this.SelectedPresetKey = this.presetKey;
 
             this.Statistics = new QueueStats();
+            this.Statistics.UpdateStats(this, null);
             this.TaskId = Guid.NewGuid().ToString();
             this.JobProgress = new QueueProgressStatus();
             this.TaskType = QueueTaskType.EncodeTask;
@@ -73,10 +76,6 @@ namespace HandBrakeWPF.Services.Queue.Model
 
         public QueueTaskType TaskType { get; set; }
 
-        /* Breakpoint Task */
-
-        public bool IsBreakpointTask => TaskType == QueueTaskType.Breakpoint;
-
         /* Encode Task*/
 
         public string ScannedSourcePath { get; set; }
@@ -86,6 +85,22 @@ namespace HandBrakeWPF.Services.Queue.Model
 
         public Title SourceTitleInfo { get; }
 
+        [JsonIgnore]
+        public bool IsShuttingDown
+        {
+            get => this.isShuttingDown;
+            set
+            {
+                if (value == this.isShuttingDown)
+                {
+                    return;
+                }
+
+                this.isShuttingDown = value;
+                this.NotifyOfPropertyChange(() => this.IsShuttingDown);
+            }
+        }
+
         public QueueItemStatus Status
         {
             get => this.status;
@@ -94,8 +109,6 @@ namespace HandBrakeWPF.Services.Queue.Model
             {
                 this.status = value;
                 this.NotifyOfPropertyChange(() => this.Status);
-                this.NotifyOfPropertyChange(() => this.ShowEncodeProgress);
-                this.NotifyOfPropertyChange(() => this.IsJobStatusVisible);
             }
         }
 
@@ -107,13 +120,6 @@ namespace HandBrakeWPF.Services.Queue.Model
 
         [JsonIgnore]
         public QueueProgressStatus JobProgress { get; set; }
-
-        [JsonIgnore]
-        public bool IsJobStatusVisible => this.Status == QueueItemStatus.InProgress;
-        
-        [JsonIgnore]
-        public bool ShowEncodeProgress => this.Status == QueueItemStatus.InProgress;
-
 
         /* Overrides */
 

@@ -10,7 +10,6 @@
 namespace HandBrakeWPF.ViewModels
 {
     using System;
-    using System.Collections.Generic;
     using System.ComponentModel;
     using System.Globalization;
     using System.Linq;
@@ -21,6 +20,7 @@ namespace HandBrakeWPF.ViewModels
     using HandBrake.Interop.Interop.Interfaces.Model.Picture;
 
     using HandBrakeWPF.EventArgs;
+    using HandBrakeWPF.Model;
     using HandBrakeWPF.Model.Filters;
     using HandBrakeWPF.Model.Picture;
     using HandBrakeWPF.Properties;
@@ -67,7 +67,7 @@ namespace HandBrakeWPF.ViewModels
 
         public IStaticPreviewViewModel StaticPreviewViewModel { get; set; }
 
-        public IEnumerable<Anamorphic> AnamorphicModes { get; } = new List<Anamorphic> { Anamorphic.None, Anamorphic.Automatic, Anamorphic.Custom };
+        public BindingList<AnamorphicMode> AnamorphicModes { get; } = new BindingList<AnamorphicMode> { AnamorphicMode.None, AnamorphicMode.Automatic, AnamorphicMode.Custom };
 
         public PadFilter PaddingFilter { get; set; }
 
@@ -450,19 +450,19 @@ namespace HandBrakeWPF.ViewModels
             }
         }
 
-        public Anamorphic SelectedAnamorphicMode
+        public AnamorphicMode SelectedAnamorphicMode
         {
-            get => this.Task.Anamorphic;
+            get => (AnamorphicMode)this.Task.Anamorphic;
 
             set
             {
                 if (!object.Equals(this.SelectedAnamorphicMode, value))
                 {
-                    this.Task.Anamorphic = value;
+                    this.Task.Anamorphic = (Anamorphic)value;
                     this.NotifyOfPropertyChange(() => this.SelectedAnamorphicMode);
                     this.RecalculatePictureSettingsProperties(ChangedPictureField.Anamorphic);
                     this.OnTabStatusChanged(null);
-                    this.IsPixelAspectSettable = value == Anamorphic.Custom;
+                    this.IsPixelAspectSettable = value == AnamorphicMode.Custom;
                     this.NotifyOfPropertyChange(() => this.IsPixelAspectSettable);
                 }
             }
@@ -500,7 +500,7 @@ namespace HandBrakeWPF.ViewModels
             this.RotateFlipFilter?.SetPreset(preset, task);
 
             // Picture Sizes and Anamorphic
-            this.SelectedAnamorphicMode = preset.Task.Anamorphic;
+            this.SelectedAnamorphicMode = (AnamorphicMode)preset.Task.Anamorphic;
             this.OptimalSize = preset.Task.OptimalSize;
             this.AllowUpscaling = preset.Task.AllowUpscaling;
 
@@ -563,6 +563,7 @@ namespace HandBrakeWPF.ViewModels
             this.NotifyOfPropertyChange(() => this.ParHeight);
             this.NotifyOfPropertyChange(() => this.MaxWidth);
             this.NotifyOfPropertyChange(() => this.MaxHeight);
+            this.NotifyOfPropertyChange(() => this.IsCustomCrop);
 
             this.UpdateVisibleControls();
         }
@@ -643,7 +644,7 @@ namespace HandBrakeWPF.ViewModels
 
         public bool MatchesPreset(Preset preset)
         {
-            if (preset.Task.Anamorphic != this.SelectedAnamorphicMode)
+            if ((AnamorphicMode)preset.Task.Anamorphic != this.SelectedAnamorphicMode)
             {
                 return false;
             }
@@ -683,7 +684,7 @@ namespace HandBrakeWPF.ViewModels
             if (!string.IsNullOrEmpty(this.Task.Source) && !this.StaticPreviewViewModel.IsOpen)
             {
                 this.StaticPreviewViewModel.IsOpen = true;
-                this.StaticPreviewViewModel.UpdatePreviewFrame(this.Task, this.scannedSource);
+                this.StaticPreviewViewModel.UpdatePreviewFrame(this.currentTitle, this.Task, this.scannedSource);
                 this.windowManager.ShowWindow<StaticPreviewView>(this.StaticPreviewViewModel);
             }
             else if (this.StaticPreviewViewModel.IsOpen)
@@ -743,12 +744,12 @@ namespace HandBrakeWPF.ViewModels
                 Width = this.Width,
                 Height = this.Height,
                 ItuPar = false,
-                ParW = this.SelectedAnamorphicMode == Anamorphic.None ? 1 : this.ParWidth,
-                ParH = this.SelectedAnamorphicMode == Anamorphic.None ? 1 : this.ParHeight,
+                ParW = this.SelectedAnamorphicMode == AnamorphicMode.None ? 1 : this.ParWidth,
+                ParH = this.SelectedAnamorphicMode == AnamorphicMode.None ? 1 : this.ParHeight,
                 MaxWidth = this.MaxWidth.HasValue ? this.MaxWidth.Value : 0,
                 MaxHeight = this.MaxHeight.HasValue ? this.MaxHeight.Value : 0,
                 KeepDisplayAspect = this.MaintainAspectRatio,
-                AnamorphicMode = this.SelectedAnamorphicMode,
+                AnamorphicMode = (Anamorphic)this.SelectedAnamorphicMode,
                 Crop = new Cropping(this.CropTop, this.CropBottom, this.CropLeft, this.CropRight, (int)CropMode.Custom),
                 Pad = new Padding(this.PaddingFilter.Top, this.PaddingFilter.Bottom, this.PaddingFilter.Left, this.PaddingFilter.Right),
                 RotateAngle = this.RotateFlipFilter.SelectedRotation,
@@ -757,7 +758,7 @@ namespace HandBrakeWPF.ViewModels
                 DarHeight = this.DisplayHeight
             };
 
-            if (this.SelectedAnamorphicMode == Anamorphic.Custom)
+            if (this.SelectedAnamorphicMode == AnamorphicMode.Custom)
             {
                 if (changedField == ChangedPictureField.DisplayWidth)
                 {
@@ -799,7 +800,7 @@ namespace HandBrakeWPF.ViewModels
             this.UpdateVisibleControls();
 
             // Step 2, Set sensible defaults
-            if (changedField == ChangedPictureField.Anamorphic && (this.SelectedAnamorphicMode == Anamorphic.None))
+            if (changedField == ChangedPictureField.Anamorphic && (this.SelectedAnamorphicMode == AnamorphicMode.None))
             {
                 this.Task.Width = this.sourceResolution.Width > this.MaxWidth
                                       ? this.MaxWidth
@@ -894,8 +895,10 @@ namespace HandBrakeWPF.ViewModels
             // Step 5, Update the Preview
             if (delayedPreviewprocessor != null && this.Task != null && this.StaticPreviewViewModel != null && this.StaticPreviewViewModel.IsOpen)
             {
-                delayedPreviewprocessor.PerformTask(() => this.StaticPreviewViewModel.UpdatePreviewFrame(this.Task, this.scannedSource), 800);
+                delayedPreviewprocessor.PerformTask(() => this.StaticPreviewViewModel.UpdatePreviewFrame(this.currentTitle, this.Task, this.scannedSource), 800);
             }
+
+            this.OnTabStatusChanged(new TabStatusEventArgs("picture", ChangedOption.Dimensions));
         }
 
         private void ApplyPad(PaddingMode mode, AnamorphicResult result)

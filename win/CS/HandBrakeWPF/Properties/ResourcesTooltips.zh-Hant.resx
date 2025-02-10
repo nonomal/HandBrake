@@ -112,10 +112,10 @@
     <value>2.0</value>
   </resheader>
   <resheader name="reader">
-    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <resheader name="writer">
-    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="FilterView_Deblock" xml:space="preserve">
     <value>Deblock 可減少低品質視訊壓縮造成的塊狀瑕疵。</value>
@@ -163,15 +163,13 @@ HQDN3D 是個適應性的低通濾鏡，速度較 NLMeans 快，但保留精細�
 藍光及 DVD 來源通常具有多個標題，一般時間最長的是正片。</value>
   </data>
   <data name="PictureSettingsView_Anamorphic" xml:space="preserve">
-    <value>Anamorphic 允許任意的儲存尺寸，同時在播放時保留原始長寬比。
+    <value>Anamorphic allows arbitrary storage dimensions while preserving the original aspect during playback.
 
-None：停用 Anamorphic。影片的儲存尺寸與顯示尺寸相同，可保持與某些傳統裝置的相容性。
+None disables anamorphic. Video storage dimensions and display dimensions will be identical. Only useful for compatibility with certain legacy devices.
 
-Automatic：建議使用。在保留原始顯示長寬比時，最大化儲存解析度。
+Automatic maximizes storage resolution while preserving the original display aspect ratio. Recommended.
 
-Loose：與 Auto 相似，但會試圖保留儲存長寬比。與 Auto 相比，可能會稍微損失儲存解析度。
-
-Custom：允許手動設定所有參數。適用於矯正錯誤的顯示長寬比，以及需要進行進階後製的專業人士。</value>
+Custom allows manually setting all parameters. Useful for correcting an incorrect source display aspect and for professionals needing advanced control in post-production.</value>
   </data>
   <data name="PictureSettingsView_AutoCrop" xml:space="preserve">
     <value>自動裁切影片周圍的黑邊。</value>
@@ -261,12 +259,15 @@ Custom：允許手動設定所有參數。適用於矯正錯誤的顯示長寬�
     <value>啟用可變影格率輸出，其峰值影格率由影格率設定決定。</value>
   </data>
   <data name="Video_Presets" xml:space="preserve">
-    <value>調整編碼器設定以權衡壓縮效率與編碼速度。
+    <value>Adjusts encoder settings to trade off compression efficiency against encoding speed.
 
-以此建立預設編碼器設定。
-Tunes、profiles、levels 及其他進階選項字串亦套用於此。
-一般而言，在可允許的程度內愈慢愈好，
-因為較慢的設定會產出較高品質或較小的檔案。</value>
+This establishes your default encoder settings.
+Tunes, profiles, levels and advanced option string will be applied to this.
+You should generally set this option to the slowest you can bear since slower
+settings will result in better quality or smaller files.
+
+Adjust the slider to the right to increase compression efficiency at the expense of encoding speed,
+or to the left to increase encoding speed at the expense of compression efficiency.</value>
   </data>
   <data name="Video_Profile" xml:space="preserve">
     <value>設定並確保符合指定的設定值。
@@ -285,15 +286,15 @@ x264 的尺度是對數級的，且數值越低表示更佳品質。
 
 FFMpeg 及 Theora 的尺度較線性，且沒有非破壞性壓縮模式。</value>
   </data>
-  <data name="Video_TurboFirstPass" xml:space="preserve">
-    <value>在 2 Pass 編碼的首輪，使用處理速度更快的設定值。</value>
+  <data name="Video_TurboAnalysisPass" xml:space="preserve">
+    <value>During the analysis pass of a multi pass encode, use settings that speed things along.</value>
   </data>
-  <data name="Video_TwoPass" xml:space="preserve">
-    <value>進行 2 Pass 編碼。
+  <data name="Video_MultiPass" xml:space="preserve">
+    <value>Perform Multi Pass Encoding.
 
-需使用「位元速率」選項。
-此方式將進行 2 輪編碼。
-將於首輪收集分析資料，並作為第二輪分配位元速率時的參考資料。</value>
+The 'Bitrate' option is prerequisite. During the analysis passes, statistics about
+the video are collected. Then in the final pass, those statistics are used
+to make bitrate allocation decisions.</value>
   </data>
   <data name="Video_VariableFramerate" xml:space="preserve">
     <value>啟用可變影格率輸出。
@@ -357,22 +358,22 @@ HQDN3D 預設值：y-spatial=3:cb-spatial=2:cr-spatial=2:y-temporal=2:cb-tempora
 - Sprite：適用於像素風格的 2D 遊戲，此模式並非設計給高畫質影片使用。</value>
   </data>
   <data name="FilterView_Deinterlace" xml:space="preserve">
-    <value>去交錯濾鏡可去除畫面中的橫紋。
+    <value>Deinterlace removes comb artifacts from the picture.
 
-Yadif 是流行且快速的去交錯演算法。
+Bwdif and Yadif are two popular and fast deinterlacers.
 
-Decomb 會在多種插值演算法間切換，以提升速度及品質。</value>
+Decomb switches between multiple interpolation algorithms for speed and quality.</value>
   </data>
   <data name="FilterView_DeinterlaceCustom" xml:space="preserve">
-    <value>自訂去交錯參數。
+    <value>Custom Deinterlace parameters.
  
- Yadif 語法：mode=m:parity=p
+ Bwdif and Yadif syntax: mode=m:parity=p
  
- Yadif 預設值：mode=3
+ Bwdif and Yadif default: mode=3
  
- Decomb 語法：mode=m:magnitude-thresh=m:variance-thresh=v:laplacian-thresh=l:dilation-thresh=d:erosion-thresh=e:noise-thresh=n:search-distance=s:postproc=p:parity=p
+ Decomb syntax: mode=m:magnitude-thresh=m:variance-thresh=v:laplacian-thresh=l:dilation-thresh=d:erosion-thresh=e:noise-thresh=n:search-distance=s:postproc=p:parity=p
  
- Decomb 預設值：mode=7</value>
+ Decomb default: mode=7</value>
   </data>
   <data name="FilterView_DeinterlacePreset" xml:space="preserve">
     <value>去交錯濾鏡設定檔。
@@ -505,11 +506,59 @@ HB_EXIT_CODE
 建議校驗輸出檔案是否完好後再對其操作。</value>
   </data>
   <data name="Options_AdditionalFormatOptions" xml:space="preserve">
-    <value>輸出的檔案格式。除了檔案系統支援的字元外，亦可使用預留文字，將在變更標題、掃描來源或更新某些設定時自動將其替換。</value>
+    <value>The format of the output file. In addition to any supported file system character, you can use the any of the placeholders that will be replaced when you change title or scan a source or update certain settings.
+
+{source} - Name of the source file.
+{title} - Integer value. This is representative of a disc title number.
+{chapters} - The range of chapters selected.
+{creation-date} - The date that the source file was created on (if available).
+{creation-time} - The time that the source file was created on (if available).
+{modification-date} - The date that the source file was last modified on (if available).
+{modification-time} - The time that the source file was last modified on (if available).
+{date} - Today. Set at time of adding to the queue.
+{time} - Today. Set at time of adding to the queue.
+{quality_bitrate} - The RF/CQ number, or bitrate
+{quality_type} - Prints "kbps" or "Q" depending on the quality mode selected on the video tab.
+{preset} - Name of the preset selected.
+{encode_bit_depth} - Integer value. i.e. 8, 10 or 12
+{width} - The output storage width
+{height} - The output storage height
+{codec} - Display the video format.
+{encoder} - Display the short format key of the encoder used.
+
+Any illegal path characters will be removed automatically.</value>
   </data>
   <data name="OptionsView_RightToleftMode" xml:space="preserve">
     <value>對於由右至左的語言，可以從兩種模式中擇一使用。「僅有文字」只會將文字由右至左呈現；「整體使用者介面」則將所有控制項由右至左呈現。
 
 請留意，使用這些模式時使用者介面版面可能會有問題。依據不同語言，可嘗試何者效果最佳。</value>
+  </data>
+  <data name="AudioView_Quality" xml:space="preserve">
+    <value>Target a specific quality level for audio.
+1 is lowest quality and 5 is highest quality.
+
+Bitrate will vary source to source.</value>
+  </data>
+  <data name="OptionsView_DestinationReplacementOptions" xml:space="preserve">
+    <value>The following can be used singularly, or together to build up a destination path
+
+{source_path} - In the same folder as the source path (if possible)
+{source_folder_name} – The name of the directory that the source file is in, without the full path.
+{source} - The name of the source file.</value>
+  </data>
+  <data name="OptionsView_LaunchsHelp" xml:space="preserve">
+    <value>Launches the documentation website located at https://handbrake.fr/docs</value>
+  </data>
+  <data name="Options_RemovePunctuation" xml:space="preserve">
+    <value>Dash (-), Period (.) and Comma (,)</value>
+  </data>
+  <data name="PictureSettingsView_OptimalSize" xml:space="preserve">
+    <value>Use highest resolution permitted by above settings</value>
+  </data>
+  <data name="PictureSettingsView_AllowUpscaling" xml:space="preserve">
+    <value>If not enabled, scaled dimensions will be limited to source dimensions.</value>
+  </data>
+  <data name="PictureSettingsView_AutomaticKeepAR" xml:space="preserve">
+    <value>Changing the displays size will stretch the video</value>
   </data>
 </root>

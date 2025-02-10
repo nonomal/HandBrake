@@ -50,6 +50,15 @@
 
     hb_job_set_file(job, self.destinationURL.fileSystemRepresentation);
 
+    if (self.hwDecodeUsage == HBJobHardwareDecoderUsageFullPathOnly)
+    {
+        job->hw_decode = HB_DECODE_SUPPORT_VIDEOTOOLBOX;
+    }
+    else if (self.hwDecodeUsage == HBJobHardwareDecoderUsageAlways)
+    {
+        job->hw_decode = HB_DECODE_SUPPORT_VIDEOTOOLBOX | HB_DECODE_SUPPORT_FORCE_HW;
+    }
+
     // Title Angle for dvdnav
     job->angle = self.angle;
 
@@ -92,7 +101,7 @@
     job->mux = self.container;
     job->vcodec = self.video.encoder;
 
-    job->mp4_optimize = self.mp4HttpOptimize;
+    job->optimize = self.optimize;
 
     if (self.container & HB_MUX_MASK_MP4)
     {
@@ -138,12 +147,29 @@
         job->ipod_atom = self.mp4iPodCompatible;
     }
 
-    if (self.video.twoPass && ((self.video.encoder & HB_VCODEC_X264_MASK) ||
+    if (self.video.multiPass && ((self.video.encoder & HB_VCODEC_X264_MASK) ||
                                (self.video.encoder & HB_VCODEC_X265_MASK)))
     {
-        job->fastfirstpass = self.video.turboTwoPass;
+        job->fastanalysispass = self.video.turboMultiPass;
     }
-    job->twopass = self.video.twoPass;
+    job->multipass = self.video.multiPass;
+
+    switch (self.video.passthruHDRDynamicMetadata)
+    {
+        case HBVideoHDRDynamicMetadataPassthruOff:
+            job->passthru_dynamic_hdr_metadata = HB_HDR_DYNAMIC_METADATA_NONE;
+            break;
+        case HBVideoHDRDynamicMetadataPassthruHDR10Plus:
+            job->passthru_dynamic_hdr_metadata = HB_HDR_DYNAMIC_METADATA_HDR10PLUS;
+            break;
+        case HBVideoHDRDynamicMetadataPassthruDolbyVision:
+            job->passthru_dynamic_hdr_metadata = HB_HDR_DYNAMIC_METADATA_DOVI;
+            break;
+        case HBVideoHDRDynamicMetadataPassthruAll:
+        default:
+            job->passthru_dynamic_hdr_metadata = HB_HDR_DYNAMIC_METADATA_ALL;
+            break;
+    }
 
     if (hb_video_encoder_get_presets(self.video.encoder) != NULL)
     {
@@ -271,29 +297,34 @@
                 // if we are getting the subtitles from an external file
                 if (subTrack.type == IMPORTSRT || subTrack.type == IMPORTSSA)
                 {
-                    hb_subtitle_config_t sub_config;
-                    int type = subTrack.type;
-
-                    sub_config.name = subTrack.title.UTF8String;
-                    sub_config.offset = subTrack.offset;
-
-                    // we need to strncpy file name and codeset
-                    sub_config.src_filename = subTrack.fileURL.fileSystemRepresentation;
-                    strncpy(sub_config.src_codeset, subTrack.charCode.UTF8String, 39);
-                    sub_config.src_codeset[39] = 0;
-
-                    if (!subTrack.burnedIn && hb_subtitle_can_pass(type, job->mux))
+                    if (subTrack.fileURL)
                     {
-                        sub_config.dest = PASSTHRUSUB;
-                    }
-                    else if (hb_subtitle_can_burn(type))
-                    {
-                        sub_config.dest = RENDERSUB;
-                    }
+                        hb_subtitle_config_t sub_config;
+                        sub_config.name = subTrack.title.UTF8String;
+                        sub_config.offset = subTrack.offset;
 
-                    sub_config.force = 0;
-                    sub_config.default_track = subTrack.def;
-                    hb_import_subtitle_add( job, &sub_config, subTrack.isoLanguage.UTF8String, type);
+                        // we need to strncpy file name and codeset
+                        sub_config.src_filename = subTrack.fileURL.fileSystemRepresentation;
+                        if (subTrack.charCode)
+                        {
+                            size_t len = sizeof(sub_config.src_codeset) - 1;
+                            strncpy(sub_config.src_codeset, subTrack.charCode.UTF8String, len);
+                            sub_config.src_codeset[len] = 0;
+                        }
+
+                        if (!subTrack.burnedIn && hb_subtitle_can_pass(subTrack.type, job->mux))
+                        {
+                            sub_config.dest = PASSTHRUSUB;
+                        }
+                        else if (hb_subtitle_can_burn(subTrack.type))
+                        {
+                            sub_config.dest = RENDERSUB;
+                        }
+
+                        sub_config.force = 0;
+                        sub_config.default_track = subTrack.def;
+                        hb_import_subtitle_add(job, &sub_config, subTrack.isoLanguage.UTF8String, subTrack.type);
+                    }
                 }
                 else
                 {
@@ -356,6 +387,10 @@
     {
         job->acodec_copy_mask |= HB_ACODEC_MP3_PASS;
     }
+    if (audioDefaults.allowVorbisPassthru)
+    {
+        job->acodec_copy_mask |= HB_ACODEC_VORBIS_PASS;
+    }
     if (audioDefaults.allowOpusPassthru)
     {
         job->acodec_copy_mask |= HB_ACODEC_OPUS_PASS;
@@ -363,6 +398,10 @@
     if (audioDefaults.allowTrueHDPassthru)
     {
         job->acodec_copy_mask |= HB_ACODEC_TRUEHD_PASS;
+    }
+    if (audioDefaults.allowALACPassthru)
+    {
+        job->acodec_copy_mask |= HB_ACODEC_ALAC_PASS;
     }
     if (audioDefaults.allowFLACPassthru)
     {
@@ -386,7 +425,7 @@
                                    inputTrack.sampleRate :
                                    audioTrack.sampleRate);
 
-            audio->in.track = (int)audioTrack.sourceTrackIdx - 1;
+            audio->index = (int)audioTrack.sourceTrackIdx - 1;
 
             // We go ahead and assign values to our audio->out.<properties>
             audio->out.track                     = audio->in.track;

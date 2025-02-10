@@ -1,6 +1,6 @@
 /* ports.h
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -53,7 +53,8 @@ typedef struct
 #endif
 } hb_display_t;
 
-hb_display_t * hb_display_init(const char         *  driver_name,
+hb_display_t * hb_display_init(const char         * driver_name,
+                               const uint32_t       dri_render_node,
                                const char * const * interface_names);
 void           hb_display_close(hb_display_t ** _d);
 
@@ -78,6 +79,7 @@ enum hb_cpu_platform
     HB_CPU_PLATFORM_INTEL_TGL,
     HB_CPU_PLATFORM_INTEL_ADL,
     HB_CPU_PLATFORM_INTEL_DG2,
+    HB_CPU_PLATFORM_INTEL_LNL,
 };
 int         hb_get_cpu_count(void);
 int         hb_get_cpu_platform(void);
@@ -115,7 +117,7 @@ HB_DIR* hb_opendir(const char *path);
 int hb_closedir(HB_DIR *dir);
 void hb_rewinddir(HB_DIR *dir);
 struct dirent * hb_readdir(HB_DIR *dir);
-int hb_mkdir(char * name);
+int hb_mkdir(const char *name);
 int hb_stat(const char *path, hb_stat_t *sb);
 FILE * hb_fopen(const char *path, const char *mode);
 char * hb_strr_dir_sep(const char *path);
@@ -128,21 +130,18 @@ char * hb_strndup(const char * src, size_t len);
 /************************************************************************
  * File utils
  ***********************************************************************/
-char * hb_get_temporary_directory(void);
+const char * hb_get_temporary_directory(void);
 char * hb_get_temporary_filename( char *fmt, ... );
 size_t hb_getline(char **lineptr, size_t *n, FILE *fp);
 
 #ifdef __LIBHB__
-
-// Convert utf8 string to current code page.
-char * hb_utf8_to_cp(const char *src);
 
 /* Everything from now is only used internally and hidden to the UI */
 
 /************************************************************************
  * DVD utils
  ***********************************************************************/
-int hb_dvd_region(char *device, int *region_mask);
+int hb_dvd_region(const char *device, int *region_mask);
 
 #if defined( SYS_DARWIN )
 int macOS_get_user_config_directory( char path[512] );
@@ -154,10 +153,7 @@ void hb_get_user_config_filename( char name[1024], char *fmt, ... );
  ***********************************************************************/
 typedef struct hb_thread_s hb_thread_t;
 
-#if defined( SYS_BEOS )
-#  define HB_LOW_PRIORITY    5
-#  define HB_NORMAL_PRIORITY 10
-#elif defined( SYS_DARWIN )
+#if defined( SYS_DARWIN )
 #  define HB_LOW_PRIORITY    31
 #  define HB_NORMAL_PRIORITY 31
 #elif defined( SYS_CYGWIN )

@@ -14,6 +14,9 @@ namespace HandBrakeWPF.Views
     using System.Windows.Input;
     using System.Windows.Media.Imaging;
 
+    using HandBrakeWPF.Commands;
+    using HandBrakeWPF.Helpers;
+    using HandBrakeWPF.ViewModels;
     using HandBrakeWPF.ViewModels.Interfaces;
 
     /// <summary>
@@ -30,8 +33,23 @@ namespace HandBrakeWPF.Views
 
             this.SizeChanged += this.StaticPreviewView_SizeChanged;
             this.Title = Properties.Resources.Preview;
+
+            this.videoPlayer.MediaFailed += this.VideoPlayer_MediaFailed;
+
+            this.InputBindings.Add(new InputBinding(new CloseWindowCommand(this), new KeyGesture(Key.W, ModifierKeys.Control))); // Close Window
         }
 
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            WindowHelper.SetDarkMode(this);
+        }
+
+        private void VideoPlayer_MediaFailed(object sender, ExceptionRoutedEventArgs e)
+        {
+            ((StaticPreviewViewModel)this.DataContext).HandleMediaError(e.ErrorException);
+        }
+         
         private void StaticPreviewView_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             // Prevent the Window Growing Past Screen Bounds
@@ -64,6 +82,12 @@ namespace HandBrakeWPF.Views
 
         private void UpdateWindowTitle()
         {
+            if (((StaticPreviewViewModel)this.DataContext).IsMediaPlayerVisible)
+            {
+                this.Title = Properties.Resources.StaticPreviewView_VideoPreview;
+                return;
+            }
+
             BitmapSource image = ((IStaticPreviewViewModel)this.DataContext).PreviewImage;
             if (image != null && this.previewImage != null && this.previewImage.ActualWidth > 0)
             {
@@ -86,6 +110,24 @@ namespace HandBrakeWPF.Views
             {
                 this.Title = Properties.Resources.Preview;
             }
+        }
+
+        private void PlayVideo_OnClick(object sender, RoutedEventArgs e)
+        {
+            this.UpdateWindowTitle();
+            this.videoPlayer.Stop();
+            this.videoPlayer.Close();
+            ((StaticPreviewViewModel)this.DataContext).Play();
+
+            if (!((StaticPreviewViewModel)this.DataContext).UseExternalPlayer)
+            {
+                this.videoPlayer.Play();
+            }
+        }
+
+        private void ChangeMediaVolume(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            this.videoPlayer.Volume = (double)volumeSlider.Value;
         }
     }
 }

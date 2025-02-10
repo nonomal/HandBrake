@@ -15,6 +15,8 @@ namespace HandBrakeWPF.ViewModels
     using System.Linq;
     using System.Windows;
 
+    using HandBrake.Interop.Interop;
+    using HandBrake.Interop.Interop.Interfaces.Model;
     using HandBrake.Interop.Utilities;
 
     using HandBrakeWPF.Commands;
@@ -24,9 +26,8 @@ namespace HandBrakeWPF.ViewModels
     using HandBrakeWPF.Services.Interfaces;
     using HandBrakeWPF.Services.Presets.Model;
     using HandBrakeWPF.Services.Scan.Model;
+    using HandBrakeWPF.Utilities.FileDialogs;
     using HandBrakeWPF.ViewModels.Interfaces;
-
-    using Microsoft.Win32;
 
     using EncodeTask = Services.Encode.Model.EncodeTask;
     using OutputFormat = Services.Encode.Model.Models.OutputFormat;
@@ -59,7 +60,7 @@ namespace HandBrakeWPF.ViewModels
             this.SubtitleDefaultsViewModel = new SubtitlesDefaultsViewModel(windowManager);
             this.Task = new EncodeTask();
 
-            this.Languages = LanguageUtilities.MapLanguages().Keys;
+            this.Languages = HandBrakeLanguagesHelper.AllLanguagesWithAny;
             this.CharacterCodes = CharCodesUtilities.GetCharacterCodes();
 
             this.foreignAudioSearchTrack = new Subtitle { IsFakeForeignAudioScanTrack = true, Language = Resources.SubtitleViewModel_ForeignAudioSearch };
@@ -92,7 +93,7 @@ namespace HandBrakeWPF.ViewModels
         /// <summary>
         /// Gets or sets Languages.
         /// </summary>
-        public IEnumerable<string> Languages { get; set; }
+        public IEnumerable<Language> Languages { get; set; }
 
         /// <summary>
         /// Gets or sets SourceTracks.
@@ -207,7 +208,7 @@ namespace HandBrakeWPF.ViewModels
         /// </summary>
         public void AddFirstForSelectedLanguages()
         {
-            bool anyLanguageSelected = this.SubtitleBehaviours.SelectedLanguages.Contains(Constants.Any);
+            bool anyLanguageSelected = this.SubtitleBehaviours.SelectedLanguages.Any(s => s.EnglishName == Constants.Any);
             foreach (Subtitle sourceTrack in this.GetSelectedLanguagesTracks())
             {
                 // Step 2: Check if the track list already contains this track
@@ -266,7 +267,10 @@ namespace HandBrakeWPF.ViewModels
 
             dialog.ShowDialog();
 
-            this.AddInputSubtitles(dialog.FileNames);
+            if (dialog.FileNames != null)
+            {
+                this.AddInputSubtitles(dialog.FileNames);
+            }
         }
 
         public void Import(string[] subtitleFiles)
@@ -713,17 +717,16 @@ namespace HandBrakeWPF.ViewModels
         {
             // Translate to Iso Codes
             List<string> iso6392Codes = new List<string>();
-            if (this.SubtitleBehaviours.SelectedLanguages.Contains(Constants.Any))
+            if (this.SubtitleBehaviours.SelectedLanguages.Any(s => s.EnglishName == Constants.Any))
             {
-                iso6392Codes = LanguageUtilities.GetIsoCodes();
-                iso6392Codes = LanguageUtilities.OrderIsoCodes(iso6392Codes, this.SubtitleBehaviours.SelectedLanguages);
+                iso6392Codes = HandBrakeLanguagesHelper.GetIsoCodes();
+                iso6392Codes = HandBrakeLanguagesHelper.OrderIsoCodes(iso6392Codes, this.SubtitleBehaviours.SelectedLanguages);
             }
             else
             {
-                iso6392Codes = LanguageUtilities.GetLanguageCodes(this.SubtitleBehaviours.SelectedLanguages.ToArray());
+                iso6392Codes = HandBrakeLanguagesHelper.GetLanguageCodes(this.SubtitleBehaviours.SelectedLanguages);
             }
-
-
+            
             List<Subtitle> orderedSubtitles = new List<Subtitle>();
             foreach (string code in iso6392Codes)
             {
@@ -741,9 +744,8 @@ namespace HandBrakeWPF.ViewModels
         /// </returns>
         private string GetPreferredSubtitleTrackLanguage()
         {
-            string langName = this.SubtitleBehaviours.SelectedLanguages.FirstOrDefault(w => w != Constants.Any);
-            string langCode = LanguageUtilities.GetLanguageCode(langName);
-            return langCode;
+            Language language = this.SubtitleBehaviours.SelectedLanguages.FirstOrDefault(w => w.EnglishName != Constants.Any);
+            return language?.Code;
         }
 
         /// <summary>
@@ -771,13 +773,15 @@ namespace HandBrakeWPF.ViewModels
                     continue;
                 }
 
+                string extension = Path.GetExtension(srtFile);
+
                 SubtitleTrack track = new SubtitleTrack
                                           {
                                               SrtFileName = Path.GetFileNameWithoutExtension(srtFile),
                                               SrtOffset = 0,
                                               SrtCharCode = "UTF-8",
-                                              SrtLang = "English",
-                                              SubtitleType = SubtitleType.IMPORTSRT,
+                                              SrtLang = HandBrakeLanguagesHelper.GetByName("English"),
+                                              SubtitleType = extension.Contains("ass", StringComparison.InvariantCultureIgnoreCase) ? SubtitleType.IMPORTSSA : SubtitleType.IMPORTSRT,
                                               SrtPath = srtFile
                                           };
                 this.Task.SubtitleTracks.Add(track);

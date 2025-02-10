@@ -1,7 +1,7 @@
 /* unsharp.c
 
    Copyright (c) 2002 Rémi Guyomarch <rguyom at pobox.com>
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -15,7 +15,7 @@
 #define UNSHARP_STRENGTH_CHROMA_DEFAULT 0.25
 #define UNSHARP_SIZE_CHROMA_DEFAULT 7
 #define UNSHARP_SIZE_MIN 3
-#define UNSHARP_SIZE_MAX 63
+#define UNSHARP_SIZE_MAX 15
 
 typedef struct
 {
@@ -90,7 +90,8 @@ static void name##_##nbits(const uint8_t *frame_src,                            
                                  uint8_t *frame_dst,                                            \
                            const int width,                                                     \
                            const int height,                                                    \
-                           int stride,                                                          \
+                           int stride_src,                                                      \
+                           int stride_dst,                                                      \
                            unsharp_plane_context_t *ctx,                                        \
                            unsharp_thread_context_t *tctx)                                      \
 {                                                                                               \
@@ -113,7 +114,20 @@ static void name##_##nbits(const uint8_t *frame_src,                            
     {                                                                                           \
         if (src != dst)                                                                         \
         {                                                                                       \
-            memcpy(dst, src, stride * height);                                                  \
+            if (stride_src == stride_dst)                                                       \
+            {                                                                                   \
+                memcpy(dst, src, stride_dst * height);                                          \
+            }                                                                                   \
+            else                                                                                \
+            {                                                                                   \
+                const int size = stride_src < stride_dst ? ABS(stride_src) : stride_dst;        \
+                for (int yy = 0; yy < height; yy++)                                             \
+                {                                                                               \
+                    memcpy(dst, src, size);                                                     \
+                    dst += stride_dst;                                                          \
+                    src += stride_src;                                                          \
+                }                                                                               \
+            }                                                                                   \
         }                                                                                       \
                                                                                                 \
         return;                                                                                 \
@@ -124,7 +138,8 @@ static void name##_##nbits(const uint8_t *frame_src,                            
         memset(SC[y], 0, sizeof(SC[y][0]) * (width + 2 * steps));                               \
     }                                                                                           \
                                                                                                 \
-    stride /= ctx->bps;                                                                         \
+    stride_src /= ctx->bps;                                                                     \
+    stride_dst /= ctx->bps;                                                                     \
                                                                                                 \
     for (y = -steps; y < height + steps; y++)                                                   \
     {                                                                                           \
@@ -133,7 +148,7 @@ static void name##_##nbits(const uint8_t *frame_src,                            
             src2 = src;                                                                         \
         }                                                                                       \
                                                                                                 \
-        memset(SR, 0, sizeof(SR[0]) * (2 * steps - 1));                                         \
+        memset(SR, 0, sizeof(SR[0]) * (2 * steps));                                             \
                                                                                                 \
         for (x = -steps; x < width + steps; x++)                                                \
         {                                                                                       \
@@ -153,8 +168,8 @@ static void name##_##nbits(const uint8_t *frame_src,                            
                                                                                                 \
             if (x >= steps && y >= steps)                                                       \
             {                                                                                   \
-                const uint##nbits##_t *srx = src - steps * stride + x - steps;                  \
-                uint##nbits##_t       *dsx = dst - steps * stride + x - steps;                  \
+                const uint##nbits##_t *srx = src - steps * stride_src + x - steps;              \
+                uint##nbits##_t       *dsx = dst - steps * stride_dst + x - steps;              \
                                                                                                 \
                 res = (int32_t)*srx + ((((int32_t)*srx -                                        \
                      (int32_t)((Tmp1 + halfscale) >> scalebits)) * amount) >> 16);              \
@@ -164,8 +179,8 @@ static void name##_##nbits(const uint8_t *frame_src,                            
                                                                                                 \
         if (y >= 0)                                                                             \
         {                                                                                       \
-            dst += stride;                                                                      \
-            src += stride;                                                                      \
+            dst += stride_dst;                                                                  \
+            src += stride_src;                                                                  \
         }                                                                                       \
     }                                                                                           \
 }                                                                                               \
@@ -298,6 +313,11 @@ static int unsharp_init_thread(hb_filter_object_t *filter, int threads)
 
     unsharp_thread_close(pv);
     pv->thread_ctx = calloc(threads, sizeof(unsharp_thread_context3_t));
+    if (pv->thread_ctx == NULL)
+    {
+        hb_error("Unsharp calloc failed");
+        return -1;
+    }
     pv->threads = threads;
     for (int c = 0; c < 3; c++)
     {
@@ -315,7 +335,6 @@ static int unsharp_init_thread(hb_filter_object_t *filter, int threads)
                 if (tctx->SC[z] == NULL)
                 {
                     hb_error("Unsharp calloc failed");
-                    unsharp_close(filter);
                     return -1;
                 }
             }
@@ -369,10 +388,11 @@ static int unsharp_work_thread(hb_filter_object_t *filter,
                 in->plane[c].width,
                 in->plane[c].height,
                 in->plane[c].stride,
+                out->plane[c].stride,
                 ctx, tctx);
     }
 
-    out->s = in->s;
+    hb_buffer_copy_props(out, in);
     *buf_out = out;
 
     return HB_FILTER_OK;
